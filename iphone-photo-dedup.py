@@ -574,9 +574,18 @@ def my_main_func() :
         if not os.path.exists(output_dir_dup):
             os.mkdir(output_dir_dup)
 
-    # Now we have dictionaries of all the files ordered by capture time
-    # print(dup_dict_mov)
-    # print(dup_dict_pic)
+    # Now we have dictionaries of all the files ordered by capture time.
+    # Only run this for debugging purposes and
+    # only if your dictionary sizes are very small.
+    #
+    if False:
+        print('dup_dict_mov')
+        print(dup_dict_mov)
+        print(len(dup_dict_mov))
+
+        print('dup_dict_pic')
+        print(dup_dict_pic)
+        print(len(dup_dict_pic))
 
     # iterate through all times
     # create a folder (if it doesn't exit) for YYYY-MM
