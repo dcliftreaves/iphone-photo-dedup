@@ -8,6 +8,7 @@ I meant to keep this a tight little script but it kept growing as I wanted it to
 # Guidelines:
 1. Do no harm. AKA-> NEVER modify input files
 2. All input directories need to be on the same drive. That drive must support hard links.
+
 *Note: We are creating a curated view of what is already there using the filesystem as a DB and the OS file explorer as a visualizer for both files and contained data.*
 3. Only new file data created are a pickled cache of temporary data to speed up subsequent runs
 4. Things are designed to keep all processors maximally busy. (Sometimes that can mean worse performance for spinning disks and large number of CPUs.)
@@ -36,8 +37,9 @@ How to handle the case where another jpg was created from a heic and
 that has the same size but is not newer than the heic?
 
 # Output guidelines
-
+```
 CWD -- \                    # current working directory that the program is run in
       ---- dup_dict_mov.p  # list of dictionaries with movie information
       ---- dup_dict_pic.p  # list of dictionaries with picture information
       ---- outdir          # this is where the output data goes! (all hard links) (we handle name collisions with this dir name)
+```
