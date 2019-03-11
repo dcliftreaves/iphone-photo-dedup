@@ -1,7 +1,7 @@
 # iphone-photo-dedup
 Fixing the hell that has become managing iPhone photo and video downloads. Particularly solving the issue of re-downloads with HEIC and JPG when the os support transitioned.
 
-The goal is to keep the original file in whatever format we think that is. (All derivative works are lesser in quality.) Simultaneously, we organize and deduplicate all the files that we can.
+The goal is to keep the original file in whatever format we think that the original was in when captured. (All derivative works are lesser in quality.) Simultaneously, we organize and deduplicate all the files that we can.
 
 I meant to keep this a tight little script but it kept growing as I wanted it to handle more and more corner cases. Now that it is non-trivial and somewhat robust I wanted to share it with others. (I searched for a while for a similar script that could really help me to remove duplicates around this special use case. None satisfied my needs.)
 
