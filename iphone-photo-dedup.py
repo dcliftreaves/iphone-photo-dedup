@@ -670,10 +670,6 @@ def my_main_func() :
             date_subdir = time[0:4] + '-' + time[5:7]
             flm.set_date_subdir(date_subdir)
 
-            # TODO REMOVE THIS!!!!
-            if time != '_Unknown' :
-                continue
-
             if len(f_list) > 1 :
                 disambiguate_dict = defaultdict(list)
                 for f in f_list:
