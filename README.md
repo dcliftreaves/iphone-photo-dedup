@@ -8,7 +8,6 @@ I meant to keep this a tight little script but it kept growing as I wanted it to
 # Guidelines:
 1. Do no harm. AKA-> NEVER modify input files
 2. All input directories need to be on the same drive. That drive must support hard links.
-
 *Note: We are creating a curated view of what is already there using the filesystem as a DB and the OS file explorer as a visualizer for both files and contained data.*
 3. Only new file data created are a pickled cache of temporary data to speed up subsequent runs
 4. Things are designed to keep all processors maximally busy. (Sometimes that can mean worse performance for spinning disks and large number of CPUs.)
