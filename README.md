@@ -31,9 +31,14 @@ Don't change the actual input filename just modify the f_name_ext to be the corr
 12. Expand supported file types to include other raw files and Tiffs that might have been downloaded to an iOS device
 13. Create top level iphone name directories above date directories
 14. Dedup HEIC files.
+15. Add modified time as the last sorting parameter. (Oldest wins.)
 
 How to handle the case where another jpg was created from a heic and
 that has the same size but is not newer than the heic?
+
+# Random Discoveries
+- Microsoft Photo Viewer will change the size of the image when it downloads files. It appears to be always slightly larger making the original one always get selected. (If you see unexpected duplicates get through check the content creator.) All this to say that if you used Windows to download files at any point those will be different sizes and have different EXIF info than if you did it with a mac. 
+-
 
 # Output guidelines
 ```
