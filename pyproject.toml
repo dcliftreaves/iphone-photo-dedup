@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "iphone-photo-dedup"
+version = "0.2.0"
+description = "Explainable, local photo and video duplicate review"
+requires-python = ">=3.10"
+dependencies = ["Pillow>=10.4", "numpy>=1.26", "pillow-heif>=0.20"]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+build = ["pyinstaller>=6.22", "ds-store>=1.3; sys_platform == 'darwin'"]
+
+[project.scripts]
+photo-dedup = "photo_dedup.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["photo_dedup*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,10 @@
+{
+  "identifier": "default",
+  "description": "Local app window: folder selection and reveal in the OS file manager",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "dialog:allow-open",
+    "opener:allow-reveal-item-in-dir"
+  ]
+}
