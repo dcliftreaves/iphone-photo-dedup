@@ -2,6 +2,7 @@
 
 import json
 import os
+import errno
 from pathlib import Path
 import re
 import shutil
@@ -137,7 +138,14 @@ def export_manifest(manifest, destination, *, mode="hardlink", dry_run=False, pr
             if mode == "hardlink":
                 if source.stat().st_dev != staging.stat().st_dev:
                     raise ValueError("Hard links require the same filesystem; use --mode copy")
-                os.link(source, target, follow_symlinks=False)
+                try:
+                    os.link(source, target, follow_symlinks=False)
+                except OSError as error:
+                    if error.errno in {errno.ENOTSUP, errno.EOPNOTSUPP, errno.ENOSYS, errno.EXDEV}:
+                        raise ValueError('The output filesystem could not create this hard link. '
+                                         'Put imports and output on one hard-link-capable volume, '
+                                         'or explicitly choose independent copies. Source contents were not changed.') from error
+                    raise
             else:
                 shutil.copy2(source, target, follow_symlinks=False)
             if target.is_symlink() or sha256(target) != record["sha256"]:

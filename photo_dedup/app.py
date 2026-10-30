@@ -13,6 +13,7 @@ import uuid
 
 from PIL import Image, ImageDraw, ImageOps
 
+from . import __version__
 from .export import export_manifest, plan_export
 from .media import exiftool_path, normalized_image
 from .review import apply_decisions, record_id
@@ -26,7 +27,7 @@ def now():
 class AppService:
     METHODS = {'health', 'sessions', 'session', 'start_scan', 'restart_scan', 'job',
                'cancel', 'groups', 'group', 'preview', 'decide', 'undo', 'export_plan',
-               'start_export', 'demo', 'issues'}
+               'start_export', 'demo', 'issues', 'prepare_sources'}
 
     def __init__(self, data_dir):
         self.data_dir = Path(data_dir).expanduser().resolve()
@@ -109,8 +110,21 @@ class AppService:
         return json.loads(row[0])
 
     def health(self):
-        return dict(protocol_version=1, version='0.2.0', exiftool=bool(exiftool_path()),
+        return dict(protocol_version=1, version=__version__, exiftool=bool(exiftool_path()),
                     data_dir=str(self.data_dir), source_policy='read-only')
+
+    def prepare_sources(self, roots):
+        """Inspect source locations without writing probes or scanning their files."""
+        if not isinstance(roots, list) or not roots:
+            raise ValueError('Choose at least one import folder')
+        paths = sorted({Path(p).expanduser().resolve() for p in roots})
+        devices = set()
+        for path in paths:
+            if not path.is_dir():
+                raise ValueError(f'Folder not found: {path}')
+            devices.add(path.stat().st_dev)
+        return dict(same_filesystem=len(devices) == 1, folders=len(paths),
+                    hardlink_support_verified=False)
 
     def _active(self):
         return any(j['state'] == 'running' for j in self.jobs.values())
@@ -365,7 +379,7 @@ class AppService:
                    if r['status'] in {'ignored', 'error'} or r.get('warnings')]
         return dict(items=records[offset:offset + limit], total=len(records))
 
-    def export_plan(self, session_id, destination=None, mode='copy'):
+    def export_plan(self, session_id, destination=None, mode='hardlink'):
         if mode not in {'copy', 'hardlink'}:
             raise ValueError('Unknown export mode')
         manifest = apply_decisions(self._manifest(session_id), self._decisions(session_id))
@@ -375,6 +389,9 @@ class AppService:
         result = dict(files=len(plan), bytes=total, omitted=sum(r['status'] not in {'ignored', 'error'} and
                       not r['export_selected'] for r in manifest['records']), unresolved=max(0, session['groups'] - session['reviewed']),
                       mode=mode, destination=destination, records=[dict(source=k, destination=str(v)) for k, v in plan.items()])
+        result['ignored'] = sum(r['status'] == 'ignored' for r in manifest['records'])
+        result['errors'] = sum(r['status'] == 'error' for r in manifest['records'])
+        result['warnings'] = sum(bool(r.get('warnings')) for r in manifest['records'])
         if destination:
             path = Path(destination).expanduser().resolve()
             if path.exists():
@@ -391,15 +408,16 @@ class AppService:
             if mode == 'hardlink':
                 for record in manifest['records']:
                     if record['path'] in plan and record['device'] != parent.stat().st_dev:
-                        raise ValueError('These folders are on different filesystems. Choose independent copies.')
+                        raise ValueError('Hard links require all retained imports and the output on one filesystem. '
+                                         'Gather the imports on the output volume, or explicitly choose independent copies.')
             free = shutil.disk_usage(parent).free
             result['free_bytes'] = free
             if mode == 'copy' and total > free:
                 raise ValueError('There is not enough free space for independent copies at this destination')
         return result
 
-    def start_export(self, session_id, destination, mode='copy'):
-        self.export_plan(session_id, destination, mode)
+    def start_export(self, session_id, destination, mode='hardlink'):
+        approved_plan = self.export_plan(session_id, destination, mode)
         manifest = apply_decisions(self._manifest(session_id), self._decisions(session_id))
         job_id = self._new_job(session_id, 'export')
         session = self.session(session_id)
@@ -420,11 +438,14 @@ class AppService:
                 self._save_session(session)
             export_manifest(manifest, Path(destination).expanduser(), mode=mode,
                             progress=progress, check_cancel=check_cancel, staging_ready=staging_ready)
-            session.update(state='ready', last_export=str(Path(destination).expanduser().resolve()))
+            session.update(state='ready', last_export=str(Path(destination).expanduser().resolve()),
+                           last_export_mode=mode)
             session.pop('error', None)
             session.pop('pending_export', None)
             self._save_session(session)
-            return dict(destination=session['last_export'], files=len(plan))
+            return dict(destination=session['last_export'], files=len(plan), mode=mode,
+                        omitted=approved_plan['omitted'], ignored=approved_plan['ignored'],
+                        errors=approved_plan['errors'], warnings=approved_plan['warnings'])
         self._launch(job_id, task)
         return dict(job_id=job_id, session_id=session_id)
 
@@ -451,7 +472,7 @@ class AppService:
                 else:
                     im.save(folder / 'Previous imports' / f'IMG_{index:04}.jpg', quality=95)
             (folder / 'readme.txt').write_text('Synthetic demo images. Your own files have not been accessed.\n')
-        return dict(roots=[str(folder)], name='A little room to breathe · demo')
+        return dict(roots=[str(folder)], name='Mixed import history · demo')
 
     def close(self):
         for job in self.jobs.values():

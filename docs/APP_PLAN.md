@@ -2,9 +2,15 @@
 
 ## Product
 
-A private desktop application for repeated photo imports: select folders, scan,
-compare matches, save review choices, and create an organized library. Source
-files remain in place. Export is not advertised as reclaiming source disk space.
+A local consolidator for years of loose iPhone, smartphone, and SD-card imports
+from Mac and Windows hosts. Users gather imports on one hard-link-capable volume,
+review repeated downloads, and build an opinionated camera/month directory tree.
+The app leaves source contents and paths in place; users verify the result and
+manually remove the old import paths to finish. Unsupported/error entries and
+omitted alternatives must be accounted for before source trees are removed.
+
+First-run onboarding explains why the tool exists, how to prepare inputs, what the
+canonical output contains, and how to finish. The guide stays available from help.
 
 ## Design references
 
@@ -54,9 +60,9 @@ Start with direct release downloads. Automatic in-app updates are a later layer
 that requires signed update metadata and an explicit update endpoint; GitHub
 Releases alone is not an updater protocol.
 
-All work and samples stay inside this checkout. Pushing source, uploading artifacts,
-Apple notarization, and publishing releases require explicit user approval before
-those remote actions. Local build scripts and workflow definitions do not grant it.
+All development work and samples stay inside this checkout. ChatGPT Sites is not
+used for this application. The user’s current restriction requires explicit approval
+before sending content to ChatGPT Sites or its associated remote repositories.
 
 ## Verification passes
 
@@ -73,4 +79,5 @@ those remote actions. Local build scripts and workflow definitions do not grant 
 
 No direct Apple Photos library editing, permanent deletion, cloud sync, video frame
 matching, or rendered RAW comparison. Similarity remains review evidence rather
-than proof. Hard links are an advanced option; GUI exports default to copies.
+than proof. Hard links are the same-volume default; copies are a less efficient
+fallback that requires additional storage. Neither mode deletes source files.

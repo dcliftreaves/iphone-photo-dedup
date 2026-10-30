@@ -13,7 +13,7 @@ def main():
     parser.add_argument('--target',required=True)
     args=parser.parse_args()
     if os.environ.get('GITHUB_ACTIONS')!='true':
-        raise SystemExit('Release uploads are CI-only. Obtain approval before pushing source or starting release workflows.')
+        raise SystemExit('Release uploads are CI-only. Use the draft-release workflow to publish reviewed installers.')
     root=Path(__file__).resolve().parent.parent
     repo=os.environ['GITHUB_REPOSITORY']
     tag=os.environ['RELEASE_TAG']

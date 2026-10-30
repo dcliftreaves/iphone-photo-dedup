@@ -48,6 +48,8 @@ import {
   FileRecord,
 } from "./api";
 import "./style.css";
+import { version as appVersion } from "../package.json";
+import { ImportGuide, GUIDE_KEY } from "./ImportGuide";
 
 function Landscape({ variant = 0 }: { variant?: number }) {
   const colors = [
@@ -144,15 +146,50 @@ function App() {
     groupTrigger = useRef<HTMLButtonElement | null>(null);
   const [mobileNav, setMobileNav] = useState(false);
   useEffect(() => setMobileNav(false), [view]);
-  const [info, setInfo] = useState(false),
+  const [info, setInfo] = useState(() => {
+      try {
+        return !localStorage.getItem(GUIDE_KEY);
+      } catch {
+        return true;
+      }
+    }),
     [advanced, setAdvanced] = useState(false),
     [issues, setIssues] = useState<FileRecord[]>([]),
     [issueTotal, setIssueTotal] = useState(0),
     [issuePage, setIssuePage] = useState(0);
   const [destination, setDestination] = useState(""),
-    [mode, setMode] = useState("copy"),
+    [mode, setMode] = useState("hardlink"),
     [plan, setPlan] = useState<Plan | null>(null),
     [exported, setExported] = useState("");
+  const [sourcePrep, setSourcePrep] = useState<{
+    same_filesystem: boolean;
+  } | null>(null);
+  const [prepError, setPrepError] = useState("");
+  const [exportDetails, setExportDetails] = useState<Job["result"] | null>(
+    null,
+  );
+  useEffect(() => {
+    let live = true;
+    setSourcePrep(null);
+    setPrepError("");
+    if (roots.length)
+      rpc<{ same_filesystem: boolean }>("prepare_sources", { roots })
+        .then((result) => {
+          if (live) setSourcePrep(result);
+        })
+        .catch((error) => {
+          if (live) setPrepError(error.message);
+        });
+    return () => {
+      live = false;
+    };
+  }, [roots]);
+  const closeGuide = () => {
+    try {
+      localStorage.setItem(GUIDE_KEY, "seen");
+    } catch {}
+    setInfo(false);
+  };
   const handledJobs = useRef(new Set<string>());
   const scrolls = useRef<(HTMLDivElement | null)[]>([]),
     scrollLock = useRef(false);
@@ -296,6 +333,7 @@ function App() {
         setNotice(job.error || "Stopped safely. Your originals are unchanged.");
       if (job.state === "complete" && job.kind === "export") {
         setExported(job.result?.destination || "");
+        setExportDetails(job.result || null);
         setView("export");
       } else if (job.kind === "scan") setView("review");
     })().catch(reportError);
@@ -403,7 +441,7 @@ function App() {
           </span>
           <span>
             Photo Dedup
-            <span className="brand-caption">A little room to breathe</span>
+            <span className="brand-caption">iPhone & SD-card archives</span>
           </span>
         </button>
         <button
@@ -495,8 +533,8 @@ function App() {
             className="nav-item"
             onClick={() => setInfo(true)}
           >
-            <CircleHelp size={17} /> About & help{" "}
-            <span className="version">v0.2</span>
+            <CircleHelp size={17} /> Guide & help{" "}
+            <span className="version">v{appVersion}</span>
           </button>
         </div>
       </aside>
@@ -517,7 +555,7 @@ function App() {
           </div>
           <span className="safe-label">
             <LockKeyhole size={13} />
-            <span>Originals stay untouched</span>
+            <span>Source files are not rewritten</span>
           </span>
         </header>
         <main>
@@ -540,21 +578,21 @@ function App() {
             <>
               <section className="welcome">
                 <div className="eyebrow">
-                  <span /> LESS CLUTTER. MORE CLARITY.
+                  <span /> IPHONE ARCHIVES · SMARTPHONE & SD-CARD IMPORTS
                 </div>
                 <h1>
-                  A little room
+                  One home for
                   <br />
-                  to breathe<span>.</span>
+                  years of imports<span>.</span>
                 </h1>
                 <p>
-                  Find the photos worth keeping.
+                  Consolidate years of Mac and Windows media downloads.
                   <br />
-                  Bring a little order to years of memories.
+                  Build one camera-and-date library on a single volume.
                 </p>
                 <div className="welcome-assurance">
-                  <ShieldCheck size={16} /> Review first. Your originals always
-                  stay safe.
+                  <ShieldCheck size={16} /> Prepare on one volume. Review,
+                  build, then remove old imports yourself.
                 </div>
               </section>
               <div className="welcome-art" aria-hidden="true">
@@ -564,12 +602,12 @@ function App() {
                 <div className="art-photo art-front">
                   <Landscape />
                   <div className="art-caption">
-                    <span>One memory. One favorite.</span>
+                    <span>Many imports. One archive.</span>
                     <CheckCircle2 size={16} />
                   </div>
                 </div>
                 <div className="art-tag">
-                  <Sparkles size={14} /> A clearer collection
+                  <Sparkles size={14} /> Camera → capture month
                 </div>
               </div>
               <section className="setup-grid">
@@ -577,8 +615,11 @@ function App() {
                   <div className="section-heading">
                     <span className="step-number">1</span>
                     <div>
-                      <h2>Where are your photos?</h2>
-                      <p>Choose one or more folders to compare.</p>
+                      <h2>Where are your gathered imports?</h2>
+                      <p>
+                        Choose import folders already gathered on one working
+                        volume.
+                      </p>
                     </div>
                   </div>
                   <div className={`folder-drop ${dragging ? "dragging" : ""}`}>
@@ -592,7 +633,10 @@ function App() {
                           ? "Drop your photo folders here"
                           : "Add your photo folders"}
                     </h3>
-                    <p>Camera imports, old downloads, or a backup folder.</p>
+                    <p>
+                      Old iPhone downloads, smartphone imports, and SD-card
+                      transfers.
+                    </p>
                     {!native && (
                       <div className="path-input">
                         <label className="sr-only" htmlFor="source-path">
@@ -635,6 +679,29 @@ function App() {
                       ))}
                     </ul>
                   )}
+                  {roots.length > 0 && (
+                    <div
+                      className={`source-preparation ${prepError || sourcePrep?.same_filesystem === false ? "needs-prep" : ""}`}
+                      role="status"
+                    >
+                      <Folder size={16} />
+                      <p>
+                        {prepError ||
+                          (sourcePrep
+                            ? sourcePrep.same_filesystem
+                              ? "These import folders share one filesystem. Put the output on this volume too; it must support hard links."
+                              : "These imports span filesystems. Gather them on one working volume for efficient hard links, or explicitly use independent copies."
+                            : "Checking the locations of your import folders…")}
+                      </p>
+                    </div>
+                  )}
+                  <button
+                    className="text-button reopen-guide"
+                    onClick={() => setInfo(true)}
+                  >
+                    How to prepare imports and finish the consolidation{" "}
+                    <CircleHelp size={14} />
+                  </button>
                   <button
                     className="advanced-toggle"
                     onClick={() => setAdvanced(!advanced)}
@@ -710,30 +777,32 @@ function App() {
                       disabled={!roots.length || busy || isRunning}
                       onClick={() => void perform(() => start())}
                     >
-                      Find duplicates <ArrowRight size={16} />
+                      Scan imports <ArrowRight size={16} />
                     </button>
                   </div>
                 </div>
                 <div className="how-card">
-                  <span className="eyebrow">A THOUGHTFUL LITTLE CLEANUP</span>
+                  <span className="eyebrow">
+                    ONE VOLUME. ONE CANONICAL STRUCTURE.
+                  </span>
                   <h2>
-                    Make space for
+                    Consolidate the
                     <br />
-                    what matters.
+                    import history.
                   </h2>
                   <ol>
                     {[
                       [
-                        "Find the overlaps",
-                        "We look for identical files and photos that might be similar.",
+                        "Gather on one volume",
+                        "Keep Mac, Windows, and SD-card imports in separate source folders, with their companions.",
                       ],
                       [
-                        "You make the call",
-                        "Compare side by side. Keep your favorite, or keep both.",
+                        "Review and build",
+                        "Choose retained media. Hard-link it into camera/month folders; uncertain matches stay in review/.",
                       ],
                       [
-                        "Create a fresh library",
-                        "Export an organized collection. Your source files stay right where they are.",
+                        "Finish the consolidation",
+                        "Verify the library and account for unexported files. Then manually remove the old imports.",
                       ],
                     ].map(([title, body], i) => (
                       <li key={title}>
@@ -759,8 +828,8 @@ function App() {
                 </div>
               </section>
               <div className="bottom-note">
-                <Leaf size={15} /> Made for your photos. Designed for your peace
-                of mind.
+                <Leaf size={15} /> An opinionated import archive. No media
+                rewriting or automatic source deletion.
               </div>
             </>
           )}
@@ -770,23 +839,23 @@ function App() {
                 <div>
                   <div className="eyebrow">
                     {view === "review"
-                      ? "YOUR LIBRARY, A LITTLE LIGHTER"
+                      ? "REVIEW REPEATED IMPORTS BEFORE CONSOLIDATING"
                       : view === "export"
-                        ? "THE NEXT CHAPTER"
+                        ? "BUILD THE CANONICAL ARCHIVE"
                         : "EVERY FILE ACCOUNTED FOR"}
                   </div>
                   <h1>
                     {view === "review"
-                      ? "A clearer picture."
+                      ? "Review your imports."
                       : view === "export"
-                        ? "Make it your library."
+                        ? "Build the canonical library."
                         : "Nothing left unexplained."}
                   </h1>
                   <p>
                     {view === "review"
                       ? session.name
                       : view === "export"
-                        ? "Your choices, organized into a fresh folder. Originals stay put."
+                        ? "Camera/month folders, retained companions, and a complete audit. Source cleanup comes afterward."
                         : "Unsupported files and metadata warnings are listed here for review."}
                   </p>
                 </div>
@@ -1122,12 +1191,46 @@ function App() {
                         <span>
                           <CheckCheck size={35} />
                         </span>
-                        <h2>A fresh start for your photos.</h2>
+                        <h2>Your canonical library is built.</h2>
                         <p>
-                          Your organized library is ready. Original files were
-                          left in place.
+                          The old import folders still exist. Inspect the new
+                          library and account for files left behind before
+                          removing them yourself.
                         </p>
                         <code>{exported}</code>
+                        <div className="cleanup-next">
+                          <h3>Finish the consolidation</h3>
+                          <ol>
+                            <li>
+                              Inspect curated/ and review/ and spot-check your
+                              retained photos and videos.
+                            </li>
+                            <li>
+                              Check files.csv and Skipped & warnings. Preserve
+                              any omitted alternatives, unsupported files, or
+                              read errors you still need.
+                            </li>
+                            <li>
+                              After verifying the result and your backup,
+                              manually remove the old import files in Finder or
+                              Explorer. The app does not delete them.
+                            </li>
+                          </ol>
+                          <p>
+                            {exportDetails?.mode === "hardlink"
+                              ? "This export uses hard links: removing an old source path leaves its retained library link intact. Shared content can still be changed through either remaining path."
+                              : "This export uses independent copies. Verify those copies before removing the old sources."}
+                          </p>
+                          <p>
+                            <strong>Left only at source:</strong>{" "}
+                            {exportDetails?.omitted ?? 0} unselected
+                            alternatives; {exportDetails?.ignored ?? 0}{" "}
+                            unsupported entries; {exportDetails?.errors ?? 0}{" "}
+                            read errors. Do not delete source trees wholesale
+                            without accounting for these.
+                          </p>
+                        </div>
+
                         <button
                           className="button primary"
                           onClick={() =>
@@ -1161,8 +1264,8 @@ function App() {
                           <div>
                             <h2>Choose a new home</h2>
                             <p>
-                              We create a new folder, never overwrite an
-                              existing one.
+                              Choose a new sibling folder on the same volume as
+                              your imports.
                             </p>
                           </div>
                         </div>
@@ -1197,26 +1300,6 @@ function App() {
                           )}
                         </div>
                         <div className="mode-options">
-                          <label className={mode === "copy" ? "checked" : ""}>
-                            <input
-                              type="radio"
-                              name="mode"
-                              value="copy"
-                              checked={mode === "copy"}
-                              onChange={() => setMode("copy")}
-                            />
-                            <span>
-                              <strong>
-                                Independent copies{" "}
-                                <span className="recommended">Recommended</span>
-                              </strong>
-                              <small>
-                                Edit your new library without affecting your
-                                originals.
-                              </small>
-                            </span>
-                            <Copy size={19} />
-                          </label>
                           <label
                             className={mode === "hardlink" ? "checked" : ""}
                           >
@@ -1225,20 +1308,60 @@ function App() {
                               name="mode"
                               value="hardlink"
                               checked={mode === "hardlink"}
+                              disabled={isRunning}
                               onChange={() => setMode("hardlink")}
                             />
                             <span>
                               <strong>
                                 Hard links{" "}
-                                <span className="advanced-badge">Advanced</span>
+                                <span className="recommended">
+                                  Same-volume workflow
+                                </span>
                               </strong>
                               <small>
-                                Same filesystem only. Editing either file
-                                changes both.
+                                No second copy of retained media data. Sources
+                                and output must share a hard-link-capable
+                                volume. Editing either linked path can change
+                                both.
                               </small>
                             </span>
                             <Layers2 size={19} />
                           </label>
+                          <label className={mode === "copy" ? "checked" : ""}>
+                            <input
+                              type="radio"
+                              name="mode"
+                              value="copy"
+                              checked={mode === "copy"}
+                              disabled={isRunning}
+                              onChange={() => setMode("copy")}
+                            />
+                            <span>
+                              <strong>
+                                Independent copies{" "}
+                                <span className="advanced-badge">Fallback</span>
+                              </strong>
+                              <small>
+                                For different volumes or filesystems without
+                                hard links. Needs space for another copy of the
+                                selected media.
+                              </small>
+                            </span>
+                            <Copy size={19} />
+                          </label>
+                        </div>
+                        <div className="output-structure">
+                          <h3>The structure you get</h3>
+                          <code>
+                            curated/&lt;camera&gt;/&lt;YYYY-MM&gt;/…
+                            <br />
+                            review/&lt;camera&gt;/&lt;YYYY-MM&gt;/…
+                          </code>
+                          <p>
+                            Uncertain retained matches stay in review/. Missing
+                            dates use Unknown-date. The manifest, CSV, and
+                            summary explain every source file.
+                          </p>
                         </div>
                         <button
                           className="button secondary full"
@@ -1282,6 +1405,18 @@ function App() {
                               <span>Groups still awaiting a choice</span>
                               <strong>{plan.unresolved}</strong>
                             </div>
+                            <div>
+                              <span>Unsupported entries not exported</span>
+                              <strong>{plan.ignored}</strong>
+                            </div>
+                            <div>
+                              <span>Read errors not exported</span>
+                              <strong>{plan.errors}</strong>
+                            </div>
+                            <div>
+                              <span>Files with warnings to inspect</span>
+                              <strong>{plan.warnings}</strong>
+                            </div>
                             {plan.unresolved > 0 && (
                               <p className="plan-note">
                                 Unreviewed similar and possible matches are kept
@@ -1323,9 +1458,9 @@ function App() {
                   <div className="export-explainer">
                     <ShieldCheck size={29} />
                     <h2>
-                      A new collection.
+                      One canonical structure.
                       <br />
-                      The same peace of mind.
+                      Your cleanup comes next.
                     </h2>
                     <p>
                       Every exported file is checked against its scan
@@ -1333,7 +1468,8 @@ function App() {
                     </p>
                     <ul>
                       <li>
-                        <Check size={15} /> Your originals stay in place
+                        <Check size={15} /> Old imports remain until you remove
+                        them
                       </li>
                       <li>
                         <Check size={15} /> Sidecars and companions are
@@ -1348,8 +1484,10 @@ function App() {
                       </li>
                     </ul>
                     <div className="small-note">
-                      Creating a library does not free space in your source
-                      folders. This app does not delete source files.
+                      After verification, you manually remove old import paths.
+                      Hard-linked retained files stay accessible in the new
+                      library. Omitted alternatives and unhandled files may
+                      exist only in the old folders.
                     </div>
                   </div>
                 </section>
@@ -1596,54 +1734,14 @@ function App() {
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
-      <Dialog.Root open={info} onOpenChange={setInfo}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="dialog-overlay" />
-          <Dialog.Content
-            className="help-dialog"
-            onCloseAutoFocus={(e) => {
-              e.preventDefault();
-              helpTrigger.current?.focus();
-            }}
-          >
-            <Dialog.Close
-              className="icon-button help-close"
-              aria-label="Close help"
-            >
-              <X size={20} />
-            </Dialog.Close>
-            <span className="brand-icon">
-              <Layers2 size={25} />
-            </span>
-            <Dialog.Title>A little room to breathe.</Dialog.Title>
-            <Dialog.Description>
-              Photo Dedup helps you review repeated photo imports and create an
-              organized library.
-            </Dialog.Description>
-            <h3>Your files stay yours</h3>
-            <p>
-              Scans, previews, and choices stay on this computer. There is no
-              account, telemetry, or photo upload. Source files are never
-              deleted or edited by the app.
-            </p>
-            <h3>Know your matches</h3>
-            <p>
-              <strong>Identical:</strong> the file bytes match.{" "}
-              <strong>Similar:</strong> image previews look alike, but edits may
-              differ. <strong>Possible:</strong> metadata agrees; media content
-              is not verified.
-            </p>
-            <h3>A few useful details</h3>
-            <p>
-              HEIC and common images have previews. Videos and RAW files
-              currently use byte and metadata matching. Export originals from
-              Apple Photos before scanning; direct Photos library editing is not
-              supported. Review choices save automatically and can be undone.
-            </p>
-            <small>Photo Dedup 0.2.0 · Apache-2.0 · Works offline</small>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+      <ImportGuide
+        open={info}
+        onClose={closeGuide}
+        returnFocus={() => {
+          if (helpTrigger.current?.offsetParent) helpTrigger.current.focus();
+          else document.querySelector<HTMLButtonElement>(".new-scan")?.focus();
+        }}
+      />
       {busy && !group && (
         <span className="busy-indicator" role="status">
           <LoaderCircle size={15} className="spin" /> Working locally…

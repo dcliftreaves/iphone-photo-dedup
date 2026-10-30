@@ -3,6 +3,7 @@ import json
 import argparse
 import os
 from pathlib import Path
+from photo_dedup import __version__
 import subprocess
 import tempfile
 import time
@@ -32,7 +33,11 @@ with tempfile.TemporaryDirectory(prefix='packaged-smoke-', dir=validation) as sc
     try:
         health = call('health')
         assert health['exiftool'], health
+        assert health['version'] == __version__, health
         demo = call('demo')
+        preparation = call('prepare_sources', {'roots':demo['roots']})
+        assert preparation['same_filesystem'] is True, preparation
+        assert preparation['hardlink_support_verified'] is False, preparation
         job = call('start_scan', demo)
         end = time.monotonic() + 60
         while time.monotonic() < end:
@@ -45,6 +50,8 @@ with tempfile.TemporaryDirectory(prefix='packaged-smoke-', dir=validation) as sc
         assert groups['total'] == 3, groups
         record = call('group', {'session_id':job['session_id'], 'group_id':groups['items'][0]['id']})['records'][0]
         assert call('preview', {'session_id':job['session_id'],'file_id':record['id']})['image']
+        plan = call('export_plan', {'session_id':job['session_id']})
+        assert plan['mode'] == 'hardlink' and plan['ignored'] == 1, plan
         print('Bundled engine: metadata tool, scan, matching, SQLite sessions, and image preview passed.')
     finally:
         worker.stdin.close()

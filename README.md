@@ -1,15 +1,27 @@
 # iPhone Photo Dedup
 
-A local desktop app and CLI for reviewing duplicate photos and videos, especially
-repeated iPhone imports and HEIC/JPEG derivatives. Compare matches, save your choices,
-and create an organized library. Source files are never deleted or edited.
+An opinionated consolidator for old iPhone, smartphone, and SD-card media gathered
+through years of Mac and Windows imports. Collect the loose import folders on one
+working volume, review repeated downloads and conversions, and build a canonical
+camera/month library using hard links without rewriting source file contents.
+
+**Preparation and the final cleanup are part of the workflow.** Every retained
+source and the output must share a hard-link-capable filesystem for efficient
+consolidation. After inspecting the output and accounting for unexported files,
+you manually remove the old import paths. The app does not do that deletion for you.
+
+Start with the first-run guide in the app or [the full workflow](docs/USER_GUIDE.md).
+This is not direct Apple Photos library editing or an exhaustive search for every
+visually related image. Uncertain matches and metadata limitations remain visible.
 
 ## Desktop application
 
 The Tauri desktop application bundles the Python engine, HEIC decoding, and
 ExifTool. It provides folder selection and drag-and-drop, grouped review,
 synchronized image comparison, saved decisions and undo, and verified export.
-Independent copies are the GUI default; hard links are an advanced option.
+Hard links are the same-volume default. Independent copies are an explicit fallback
+for other filesystems and require additional storage. The first-run guide covers
+preparation, the output structure, and the user’s final source-cleanup step.
 
 Download native installers from GitHub Releases after the release has been
 published. Release automation is prepared in .github/workflows/release.yml;

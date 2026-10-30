@@ -113,15 +113,14 @@ GitHub can automate signing, but it cannot issue these identities. Without valid
 credentials, artifacts remain development builds and should not be presented as
 normal, publicly installable signed software.
 
-## Approval and publication
+## Publication
 
-The user's global AGENTS.md requires explicit approval before uploading source,
-builds, or project files. Do not push commits/tags, dispatch upload workflows,
-submit for notarization, or publish a release without destination/content approval.
-Prepare and test everything locally first. That restriction also applies to private
-repositories, Actions artifacts, and draft releases.
+The application uses GitHub Actions and GitHub Releases, not ChatGPT Sites.
+Current AGENTS.md restrictions prohibit sending data to ChatGPT Sites or its
+associated repositories without explicit approval. Keep local photos, archives,
+caches, and credentials out of source and release uploads.
 
-After approval, push the reviewed source to dcliftreaves/iphone-photo-dedup, allow
+Push the reviewed source to dcliftreaves/iphone-photo-dedup, allow
 Checks to pass, and manually dispatch the draft-release workflow. Install and test
 the signed artifacts on clean machines before changing the draft into a public
 release. Windows and Intel macOS builds require those target runners/machines;

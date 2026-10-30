@@ -247,3 +247,71 @@ def test_crashed_export_only_removes_a_marked_owned_staging_directory(tmp_path):
         assert 'partial export was removed' in restored.session(session_id)['error']
     finally:
         restored.close()
+
+
+def test_source_preparation_checks_locations_without_writing_to_imports(app, tmp_path, monkeypatch):
+    root=tmp_path/'imports'
+    first=root/'Mac downloads'
+    second=root/'Windows downloads'
+    first.mkdir(parents=True)
+    second.mkdir()
+    before=list(root.rglob('*'))
+    result=app.prepare_sources([str(first),str(second)])
+    assert result['same_filesystem'] is True
+    assert result['hardlink_support_verified'] is False
+    assert list(root.rglob('*'))==before
+    import os
+    real_stat=Path.stat
+    def other_device(path, *args, **kwargs):
+        stat=real_stat(path,*args,**kwargs)
+        if path==second:
+            values=list(stat)
+            values[2]=stat.st_dev+1
+            return os.stat_result(values)
+        return stat
+    monkeypatch.setattr(Path,'stat',other_device)
+    assert app.prepare_sources([str(first),str(second)])['same_filesystem'] is False
+
+
+def test_same_volume_workflow_defaults_to_links_and_reports_unhandled_inputs(app, tmp_path):
+    session=ready_demo(app)
+    preview=app.export_plan(session)
+    assert preview['mode']=='hardlink'
+    assert preview['ignored']==1
+    assert preview['errors']==0
+    target=tmp_path/'Canonical library'
+    started=app.start_export(session,str(target))
+    result=wait(app,started['job_id'])
+    assert result['state']=='complete',result
+    assert result['result']['mode']=='hardlink'
+    assert result['result']['ignored']==1
+    exported=json.loads((target/'manifest.json').read_text())
+    record=next(r for r in exported['records'] if r.get('export_path'))
+    source=Path(record['path'])
+    retained=target/record['export_path']
+    assert source.stat().st_ino==retained.stat().st_ino
+    expected=retained.read_bytes()
+    # Simulate the user's explicit final cleanup of a synthetic source entry.
+    source.unlink()
+    assert retained.read_bytes()==expected
+    assert app.session(session)['last_export_mode']=='hardlink'
+
+
+def test_unsupported_hardlinks_explain_preparation_and_never_silently_copy(app, tmp_path, monkeypatch):
+    import errno
+    from photo_dedup.media import sha256
+    session=ready_demo(app)
+    source=next(Path(r['path']) for r in app._manifest(session)['records'] if r['status']=='keep')
+    before=sha256(source)
+    def unsupported(*args,**kwargs):
+        raise OSError(errno.ENOTSUP,'Hard links not supported')
+    monkeypatch.setattr('photo_dedup.export.os.link',unsupported)
+    destination=tmp_path/'Canonical library'
+    started=app.start_export(session,str(destination))
+    result=wait(app,started['job_id'])
+    assert result['state']=='error'
+    assert 'hard-link-capable volume' in result['error']
+    assert 'explicitly choose independent copies' in result['error']
+    assert not destination.exists()
+    assert not list(tmp_path.glob('.Canonical library-*'))
+    assert sha256(source)==before

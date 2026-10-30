@@ -2291,3 +2291,429 @@ main {
   padding: 8px;
   border-radius: 4px;
 }
+/* Import consolidation: first-run preparation and an explicit handoff to cleanup. */
+.welcome h1 {
+  font-size: 58px;
+  max-width: 570px;
+}
+.welcome .eyebrow {
+  max-width: 520px;
+  line-height: 1.6;
+}
+.welcome-assurance {
+  max-width: 520px;
+  line-height: 1.6;
+  font-size: 12px;
+  color: #58694e;
+}
+.reopen-guide {
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: left;
+  margin-top: 14px;
+}
+.source-preparation {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  background: #f0f5e9;
+  border: 1px solid #d8e3cc;
+  border-radius: 6px;
+  padding: 12px;
+  margin-top: 12px;
+}
+.source-preparation > svg {
+  margin-top: 3px;
+  color: #49643b;
+}
+.source-preparation p {
+  font-size: 12px;
+  line-height: 1.65;
+  color: #4e6341;
+}
+.source-preparation.needs-prep {
+  background: #faf3e8;
+  border-color: #e3d0b4;
+}
+.source-preparation.needs-prep p {
+  color: #765b35;
+}
+.output-structure {
+  background: #f5f7ef;
+  border: 1px solid #dfe7d5;
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 22px;
+}
+.output-structure h3 {
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+.output-structure code {
+  display: block;
+  font-size: 12px;
+  color: #3c5744;
+  line-height: 1.8;
+}
+.output-structure p {
+  font-size: 12px;
+  margin-top: 10px;
+  color: #59694e;
+}
+.cleanup-next {
+  text-align: left;
+  border: 1px solid #d8e1cc;
+  border-radius: 7px;
+  background: #f6f8ef;
+  padding: 18px;
+  margin: 18px 0 22px;
+}
+.cleanup-next h3 {
+  font-size: 15px;
+  color: #34563e;
+}
+.cleanup-next ol {
+  padding-left: 20px;
+  margin: 13px 0;
+  color: #4e6045;
+  font-size: 13px;
+  line-height: 1.75;
+}
+.cleanup-next li {
+  padding-left: 3px;
+  margin-bottom: 9px;
+}
+.cleanup-next p {
+  font-size: 12px;
+  color: #59654b;
+  line-height: 1.7;
+}
+.import-guide {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(920px, 94vw);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background: #fbfcf8;
+  border: 1px solid #d9e2cf;
+  border-radius: 13px;
+  z-index: 45;
+  box-shadow: 0 30px 100px #12322235;
+  overflow: hidden;
+}
+.guide-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 23px;
+  border-bottom: 1px solid #dfe7d4;
+  gap: 15px;
+  flex-shrink: 0;
+}
+.guide-topline > span {
+  font-size: 10px;
+  letter-spacing: 1.7px;
+  font-weight: 650;
+  color: #596b4c;
+}
+.guide-layout {
+  display: grid;
+  grid-template-columns: 215px minmax(0, 1fr);
+  overflow: hidden;
+  min-height: 0;
+}
+.guide-steps {
+  padding: 23px 15px;
+  background: #eff3e9;
+  border-right: 1px solid #dde6d2;
+}
+.guide-steps button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 13px 10px;
+  margin-bottom: 7px;
+  border-radius: 6px;
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #536449;
+}
+.guide-steps button > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #cbd9c0;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  font-size: 11px;
+  background: #fafcf6;
+}
+.guide-steps button.current {
+  background: #dde8d2;
+  color: #244b35;
+  font-weight: 600;
+}
+.guide-steps button.current > span {
+  background: #315b43;
+  color: white;
+  border-color: #315b43;
+}
+.guide-steps > p {
+  font-size: 12px;
+  line-height: 1.8;
+  color: #59684f;
+  padding: 17px 10px 0;
+  border-top: 1px solid #d4dfc8;
+  margin-top: 18px;
+}
+.guide-main {
+  padding: 27px 30px;
+  overflow: auto;
+  min-height: 0;
+}
+.guide-icon {
+  color: #567c49;
+  margin-bottom: 16px;
+}
+.guide-main h2 {
+  font-family: Georgia, serif;
+  font-size: 32px;
+  line-height: 1.16;
+  letter-spacing: -0.7px;
+  font-weight: 400;
+  color: #2c4735;
+  outline: none;
+}
+#guide-description {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #53634b;
+  margin: 14px 0 18px;
+}
+.guide-body p,
+.guide-body li {
+  font-size: 13px;
+  line-height: 1.8;
+  color: #4c5d43;
+}
+.guide-body p {
+  margin-bottom: 14px;
+}
+.guide-body ol {
+  padding-left: 20px;
+  margin: 0 0 17px;
+}
+.guide-body li {
+  padding-left: 5px;
+  margin-bottom: 11px;
+}
+.guide-body strong {
+  font-weight: 600;
+  color: #304c36;
+}
+.guide-callout {
+  padding: 16px 18px;
+  background: #edf3e4;
+  border: 1px solid #d4e1c6;
+  border-radius: 7px;
+  margin-top: 17px;
+}
+.guide-callout > strong,
+.guide-callout > span {
+  display: block;
+  font-size: 13px;
+  line-height: 1.75;
+}
+.guide-callout > span {
+  color: #4f6341;
+  margin-top: 6px;
+}
+.guide-tree {
+  padding: 15px;
+  background: #f1f4eb;
+  border: 1px solid #dce5d1;
+  border-radius: 6px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  line-height: 1.8;
+  color: #3c5e40;
+  margin: 16px 0;
+}
+.guide-body .guide-small {
+  font-size: 12px;
+  line-height: 1.8;
+  color: #5b674f;
+}
+.guide-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 17px 23px;
+  border-top: 1px solid #dce5d0;
+  background: #f5f8ef;
+  flex-shrink: 0;
+}
+.guide-footer > span {
+  font-size: 12px;
+  color: #56684a;
+}
+.guide-footer > div {
+  display: flex;
+  gap: 10px;
+}
+@media (max-width: 1100px) {
+  .welcome h1 {
+    font-size: 48px;
+    max-width: 450px;
+  }
+  .welcome-assurance {
+    max-width: 390px;
+  }
+  .welcome .eyebrow {
+    max-width: 400px;
+    font-size: 9px;
+  }
+}
+@media (max-width: 900px) {
+  .guide-layout {
+    grid-template-columns: 185px minmax(0, 1fr);
+  }
+  .guide-main {
+    padding: 24px;
+  }
+  .guide-main h2 {
+    font-size: 29px;
+  }
+  .guide-steps {
+    padding: 20px 10px;
+  }
+  .guide-steps button {
+    font-size: 11px;
+  }
+  .welcome h1 {
+    font-size: 45px;
+    max-width: 360px;
+  }
+  .welcome p {
+    max-width: 330px;
+  }
+  .welcome-assurance {
+    max-width: 340px;
+  }
+}
+@media (max-width: 650px) {
+  .import-guide {
+    max-height: 94vh;
+    width: 95vw;
+  }
+  .guide-layout {
+    display: flex;
+    flex-direction: column;
+  }
+  .guide-steps {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    border-right: 0;
+    border-bottom: 1px solid #dbe4d1;
+    padding: 9px;
+    flex-shrink: 0;
+  }
+  .guide-steps button {
+    margin: 0;
+    padding: 7px;
+    font-size: 11px;
+    gap: 7px;
+  }
+  .guide-steps > p {
+    display: none;
+  }
+  .guide-steps button > span {
+    width: 21px;
+    height: 21px;
+  }
+  .guide-main {
+    padding: 20px;
+  }
+  .guide-main h2 {
+    font-size: 26px;
+  }
+  .guide-topline {
+    padding: 11px 14px;
+  }
+  .guide-topline > span {
+    font-size: 9px;
+    letter-spacing: 1px;
+  }
+  .guide-icon {
+    width: 24px;
+    height: 24px;
+    margin-bottom: 12px;
+  }
+  .guide-footer {
+    padding: 13px 15px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .guide-footer > div {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .guide-footer .button {
+    font-size: 11px;
+    padding: 10px 12px;
+  }
+  .guide-tree {
+    font-size: 10px;
+    padding: 12px;
+  }
+  .welcome h1 {
+    font-size: 38px;
+    max-width: 270px;
+  }
+  .welcome p {
+    max-width: 225px;
+    font-size: 12px;
+  }
+  .welcome .eyebrow {
+    max-width: 250px;
+    font-size: 9px;
+  }
+  .welcome-art {
+    transform: scale(0.4);
+    top: 118px;
+    right: 4px;
+  }
+  .welcome-assurance {
+    max-width: 100%;
+    font-size: 11px;
+  }
+  .source-preparation p {
+    font-size: 12px;
+  }
+  .cleanup-next {
+    padding: 15px;
+  }
+  .cleanup-next li {
+    font-size: 12px;
+  }
+}
+@media (max-width: 650px) {
+  .welcome-art {
+    display: none;
+  }
+  .welcome h1,
+  .welcome p,
+  .welcome .eyebrow {
+    max-width: 100%;
+  }
+}

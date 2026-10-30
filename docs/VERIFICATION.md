@@ -1,4 +1,36 @@
-# Local verification — 2026-10-29
+# Current verification — 0.2.1 / 2026-10-30
+
+The first-run experience now explains the actual niche: old iPhone, smartphone,
+and SD-card imports accumulated across Mac and Windows hosts, gathered onto one
+hard-link-capable volume and consolidated into an opinionated camera/month tree.
+The user verifies the result and manually removes old import paths afterward.
+
+- 39 Python tests pass, including read-only source-location preparation checks,
+  default same-volume hard-link exports, explicit unexported-entry counts, retained
+  output after a synthetic source link is removed, and unsupported-hard-link errors
+  without an automatic copy fallback.
+- 18 Chromium/WebKit checks pass, including the existing scan/review/export flows
+  and first-run guidance at desktop, compact browser, and 760×650 native-minimum sizes.
+- First-run guide steps pass automated WCAG-tagged checks. Completion persists;
+  returning users can reopen the guide from help. This is not full accessibility
+  conformance certification.
+- Reviewed actual screenshots of preparation, cleanup, and the revised welcome.
+- TypeScript/Vite build and workflow validation pass.
+- Rebuilt the portable 0.2.1 worker and macOS application. Packaged-worker smoke
+  checks verify the current version, source preparation, default hard-link plan,
+  unhandled-entry counts, scanning, matching, and previews.
+- The local 0.2.1 macOS arm64 installer passes disk-image checksum verification.
+
+Current artifact: dist/Photo-Dedup-0.2.1-macos-arm64.dmg. Development signing only;
+public signing/notarization and other-platform builds remain release work.
+Screenshots are kept locally under local-validation/onboarding-review/.
+
+The original baseline below records the earlier 0.2.0 behavior. Its GUI copy default
+has been superseded by the explicit same-volume hard-link consolidation workflow.
+
+---
+
+# Original 0.2.0 baseline — 2026-10-29
 
 ## Verified
 

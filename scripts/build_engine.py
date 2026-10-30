@@ -84,7 +84,7 @@ def main():
     shutil.copytree(ROOT/'dist'/'photo-dedup-engine', target)
     # Distribute source and notices alongside the tool; the third-party tree includes
     # its own license texts. PyInstaller collects native image library dependencies.
-    (target/'BUILD-INFO.json').write_text(json.dumps(dict(engine='0.2.0', exiftool=EXIFTOOL_VERSION,
+    (target/'BUILD-INFO.json').write_text(json.dumps(dict(engine=__import__('photo_dedup').__version__, exiftool=EXIFTOOL_VERSION,
         python=sys.version, platform=sys.platform), indent=2))
     print(f'Engine ready: {target}')
 

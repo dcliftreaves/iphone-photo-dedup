@@ -10,6 +10,7 @@ export type Session = {
   counts: Record<string, number>;
   warnings?: number;
   last_export?: string;
+  last_export_mode?: string;
   error?: string;
 };
 export type FileRecord = {
@@ -58,13 +59,24 @@ export type Job = {
   phase: string;
   cached: number;
   error?: string;
-  result?: { destination: string; files: number };
+  result?: {
+    destination: string;
+    files: number;
+    mode: string;
+    omitted: number;
+    ignored: number;
+    errors: number;
+    warnings: number;
+  };
 };
 export type Plan = {
   files: number;
   bytes: number;
   omitted: number;
   unresolved: number;
+  ignored: number;
+  errors: number;
+  warnings: number;
   free_bytes?: number;
   records: { source: string; destination: string }[];
 };

@@ -67,11 +67,12 @@ const test = base.extend<{}, { appServer: { url: string; data: string } }>({
 
 async function startDemo(page: Page, url: string) {
   await page.goto(url);
+  await page.getByRole("button", { name: "Close import guide" }).click();
   await page
     .getByRole("button", { name: "Take a look with demo photos" })
     .click();
   await expect(
-    page.getByRole("heading", { name: "A clearer picture." }),
+    page.getByRole("heading", { name: "Review your imports." }),
   ).toBeVisible();
   await expect(page.locator(".group-card")).toHaveCount(3);
   await expect(page.locator(".group-card img")).toHaveCount(3);
@@ -83,11 +84,12 @@ test("pass 1: welcome screen, folder validation, and keyboard help", async ({
 }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(appServer.url);
+  await page.getByRole("button", { name: "Close import guide" }).click();
   await expect(
-    page.getByRole("heading", { name: "A little room to breathe." }),
+    page.getByRole("heading", { name: "One home for years of imports." }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Find duplicates" }),
+    page.getByRole("button", { name: "Scan imports" }),
   ).toBeDisabled();
   const welcomeAudit = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
@@ -98,18 +100,18 @@ test("pass 1: welcome screen, folder validation, and keyboard help", async ({
     fullPage: true,
     animations: "disabled",
   });
-  await page.getByRole("button", { name: "About & help" }).click();
+  await page.getByRole("button", { name: "Guide & help" }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(
-    page.getByRole("button", { name: "About & help" }),
+    page.getByRole("button", { name: "Guide & help" }),
   ).toBeFocused();
   await page
     .getByLabel("Folder path")
     .fill(join(appServer.data, "missing-folder"));
   await page.getByRole("button", { name: "Choose a folder" }).click();
-  await page.getByRole("button", { name: "Find duplicates" }).click();
+  await page.getByRole("button", { name: "Scan imports" }).click();
   await expect(page.getByRole("alert")).toContainText("Folder not found");
 });
 
@@ -165,13 +167,23 @@ test("pass 2: compare, save, undo, reopen, and verified export", async ({
   });
   await page.getByRole("button", { name: "Create my library" }).click();
   await expect(
-    page.getByRole("heading", { name: "A fresh start for your photos." }),
+    page.getByRole("heading", { name: "Your canonical library is built." }),
   ).toBeVisible();
   const manifest = JSON.parse(
     await readFile(join(destination, "manifest.json"), "utf8"),
   );
   expect(manifest.records.filter((r: any) => r.export_path)).toHaveLength(4);
   expect(manifest.records).toHaveLength(7);
+  expect(manifest.export.mode).toBe("hardlink");
+  await expect(page.locator(".cleanup-next")).toContainText(
+    "manually remove the old import files",
+  );
+  await expect(page.locator(".cleanup-next")).toContainText(
+    "unsupported entries",
+  );
+  await expect(page.locator(".cleanup-next")).toContainText(
+    "removing an old source path leaves its retained library link intact",
+  );
   expect(errors).toEqual([]);
 });
 
@@ -273,9 +285,13 @@ test("pass 5: empty folders, completed zero-file scans, and compact navigation",
   const empty = join(appServer.data, "Empty folder");
   await mkdir(empty, { recursive: true });
   await page.goto(appServer.url);
+  await page.getByRole("button", { name: "Close import guide" }).click();
   await page.getByLabel("Folder path").fill(empty);
   await page.getByRole("button", { name: "Choose a folder" }).click();
-  await page.getByRole("button", { name: "Find duplicates" }).click();
+  await expect(page.locator(".source-preparation")).toContainText(
+    "share one filesystem",
+  );
+  await page.getByRole("button", { name: "Scan imports" }).click();
   await expect(
     page.getByRole("heading", { name: "Everything has its own place." }),
   ).toBeVisible();
@@ -363,4 +379,93 @@ test("pass 7: local API rejects missing authorization, foreign origins, and inva
     headers: { Authorization: `Bearer ${token}` },
   });
   expect(accepted.status()).toBe(200);
+});
+
+test("first-run guide explains the niche, one-volume prep, output, and manual cleanup", async ({
+  page,
+  appServer,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(appServer.url);
+  const guide = page.getByRole("dialog");
+  await expect(
+    guide.getByRole("heading", {
+      name: "Years of imports. One canonical library.",
+    }),
+  ).toBeVisible();
+  await expect(guide).toContainText("Windows import");
+  await expect(guide).toContainText("JPEG conversions of HEIC originals");
+  await expect(guide).toContainText("SD-card transfers");
+  for (let step = 0; step < 4; step++) {
+    const audit = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+      .analyze();
+    expect(
+      audit.violations.map((v) => ({
+        id: v.id,
+        nodes: v.nodes.map((n) => n.target),
+      })),
+    ).toEqual([]);
+    await page.screenshot({
+      path: join(appServer.data, `10-guide-${step + 1}.png`),
+      fullPage: true,
+      animations: "disabled",
+    });
+    if (step < 3)
+      await guide.getByRole("button", { name: "Next", exact: true }).click();
+  }
+  await expect(guide).toContainText(
+    "Omitted alternatives, unsupported files, and errors may exist only in the old import folders",
+  );
+  await expect(guide).toContainText("manually remove the old source files");
+  await guide
+    .getByRole("button", { name: "Ready to prepare my media" })
+    .click();
+  await expect(guide).toHaveCount(0);
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "One home for years of imports." }),
+  ).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByRole("button", { name: "Guide & help" }).click();
+  await expect(
+    page.getByRole("heading", {
+      name: "Years of imports. One canonical library.",
+    }),
+  ).toBeVisible();
+});
+
+test("first-run guide remains navigable on a small window", async ({
+  page,
+  appServer,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(appServer.url);
+  const guide = page.getByRole("dialog");
+  for (let step = 0; step < 4; step++) {
+    await expect(guide).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    if (step < 3) {
+      await expect(
+        guide.getByRole("button", { name: "Next", exact: true }),
+      ).toBeInViewport();
+      await guide.getByRole("button", { name: "Next", exact: true }).click();
+    }
+  }
+  await page.screenshot({
+    path: join(appServer.data, "11-guide-compact.png"),
+    fullPage: true,
+    animations: "disabled",
+  });
+  await expect(
+    guide.getByRole("button", { name: "Ready to prepare my media" }),
+  ).toBeInViewport();
+  await guide
+    .getByRole("button", { name: "Ready to prepare my media" })
+    .click();
+  await expect(guide).toHaveCount(0);
 });
