@@ -83,3 +83,37 @@ comparison and generated renders are now included; the optional bounded deeper
 photo pass uses existing NumPy/Pillow plus a small LibRaw wrapper. Similarity remains review evidence rather
 than proof. Hard links are the same-volume default; copies are a less efficient
 fallback that requires additional storage. Neither mode deletes source files.
+
+
+## Freshman CS student walkthrough — 2026-10-30
+
+Three independent agents reviewed wording, workflow behavior, and actual desktop/
+compact screenshots, using a first-year CS student as the target audience. This
+was a heuristic walkthrough, not an observed study with a student. The default
+preset path was judged approachable; advanced media evidence and template syntax
+should remain optional.
+
+The review identified and corrected these obstacles:
+
+- Contradictory RAW onboarding and jargon-heavy headings: describe supported RAW
+  capabilities accurately and use “organized library” in the primary screens.
+- Ambiguous checkboxes and silent loss of changes: state that checked means include;
+  guard close/navigation with Save, Discard or Keep reviewing; show save errors
+  inside the dialog and restore keyboard focus when returning to the comparison.
+- Misleading zoom percentages: show Fit/preview magnification, state the 1,600-pixel
+  preview limit, and expose original-file access beside source-folder context.
+- Invalid output-folder expectations: explain that the app creates a folder that
+  does not exist yet, with a visible containing-folder action in the native app.
+- Broken Custom selection and exposed syntax: explicit custom mode, focused editor,
+  token explanations, presets first, and concrete paths in the export preview.
+- Success/cleanup hierarchy: put the new-library action first, show the saved
+  checklist's destination/time and limits before folder actions, and use an amber
+  source-item summary. Changing choices/layout affects the next export only.
+- Conflicting feedback: clear stale selection-saved messages and keep comparison
+  feedback inline so toasts cannot obscure modal actions.
+
+A useful real-user follow-up is to have one student prepare a small mixed import,
+choose one of two similar photos, create a library without pre-creating its folder,
+and explain which source items would be lost by deleting the imports. Success means
+they can explain the hard-link/shared-content behavior and identify source-only
+items without coaching. That observation has not been performed.

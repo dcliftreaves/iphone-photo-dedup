@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FolderOpen, ArrowLeft, ArrowRight } from "lucide-react";
 import { basename, formatBytes, native, reveal, rpc } from "./api";
 type Cleanup = {
+  destination: string;
+  exported_at: string | null;
   roots: { path: string; files: number; at_risk: number }[];
   items: { path: string; size: number; reason: string; status: string }[];
   total: number;
@@ -10,6 +12,7 @@ type Cleanup = {
   message: string;
 };
 export function CleanupReview({ sessionId }: { sessionId: string }) {
+  const attention = useRef<HTMLHeadingElement>(null);
   const [data, setData] = useState<Cleanup | null>(null),
     [error, setError] = useState(""),
     [offset, setOffset] = useState(0),
@@ -17,6 +20,7 @@ export function CleanupReview({ sessionId }: { sessionId: string }) {
   useEffect(() => {
     let live = true;
     setData(null);
+    setError("");
     rpc<Cleanup>("cleanup_review", { session_id: sessionId, offset, limit: 20 })
       .then((d) => {
         if (live) setData(d);
@@ -44,16 +48,55 @@ export function CleanupReview({ sessionId }: { sessionId: string }) {
         imports yourself.
       </p>
       {error && <p role="alert">{error}</p>}
-      {!data && !error && <p role="status">Loading saved export evidence…</p>}
+      {!data && !error && (
+        <p role="status">Loading your saved cleanup checklist…</p>
+      )}
       {data && (
         <>
+          <div className="cleanup-snapshot">
+            <strong>Saved checklist — files have not been rechecked</strong>
+            <p>
+              {data.exported_at
+                ? `Export completed ${new Date(data.exported_at).toLocaleString()}.`
+                : "Saved when this library was created."}{" "}
+              Later additions, edits or deletions are not reflected here.
+              Skipped folders may contain files not listed.
+            </p>
+            <small>Library: {data.destination}</small>
+            <details>
+              <summary>What this checklist covers</summary>
+              <p>{data.message}</p>
+            </details>
+          </div>
+          {data.total > 0 && (
+            <div className="cleanup-attention">
+              <strong>
+                {data.total} source{" "}
+                {data.total === 1 ? "item needs" : "items need"} checking before
+                you delete old folders.
+              </strong>
+              <p>
+                These items were not included and have no confirmed identical
+                copy in this export.
+              </p>
+              <button
+                className="button secondary"
+                onClick={() => {
+                  attention.current?.scrollIntoView({ block: "start" });
+                  attention.current?.focus({ preventScroll: true });
+                }}
+              >
+                Review these files
+              </button>
+            </div>
+          )}
           <p>
             <strong>{data.retained} files included</strong> ·{" "}
             {data.identical_retained}{" "}
             {data.identical_retained === 1
               ? "omitted copy has"
               : "omitted copies have"}{" "}
-            identical bytes in the library.
+            identical bytes included when this export was created.
           </p>
           <h4>Your source folders</h4>
           <ul className="cleanup-roots">
@@ -63,8 +106,8 @@ export function CleanupReview({ sessionId }: { sessionId: string }) {
                   <strong>{basename(root.path)}</strong>
                   <small>{root.path}</small>
                   <small>
-                    {root.files} inventoried entries · {root.at_risk} without a
-                    retained byte-identical counterpart
+                    {root.files} entries checked · {root.at_risk} need attention
+                    before deleting this folder
                   </small>
                 </span>
                 <button
@@ -77,7 +120,7 @@ export function CleanupReview({ sessionId }: { sessionId: string }) {
               </li>
             ))}
           </ul>
-          <h4>
+          <h4 ref={attention} tabIndex={-1}>
             {data.total === 1
               ? "1 file or entry needs"
               : `${data.total} files or entries need`}{" "}
@@ -101,7 +144,14 @@ export function CleanupReview({ sessionId }: { sessionId: string }) {
                   <strong>{basename(item.path)}</strong>
                   <small>{item.path}</small>
                   <small>
-                    {formatBytes(item.size)} · {item.status}
+                    {formatBytes(item.size)} ·{" "}
+                    {(
+                      {
+                        ignored: "Skipped",
+                        error: "Couldn’t read",
+                        review: "Not selected",
+                      } as Record<string, string>
+                    )[item.status] || "Not included"}
                   </small>
                   <p>{item.reason}</p>
                 </div>
@@ -139,7 +189,11 @@ export function CleanupReview({ sessionId }: { sessionId: string }) {
               </button>
             </div>
           )}
-          <p className="warning-note">{data.message}</p>
+          <p className="warning-note">
+            Check the current source folders, the new library and your backup
+            before deleting anything. A saved checklist cannot tell you whether
+            files were added, edited or removed later.
+          </p>
         </>
       )}
       {notice && <p role="status">{notice}</p>}

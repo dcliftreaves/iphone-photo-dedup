@@ -1,4 +1,38 @@
-# Current verification — 0.3.0 / 2026-10-30
+# Current verification — 0.3.1 / 2026-10-30
+
+Three independent agents reviewed copy, workflow behavior, and actual desktop and
+compact screenshots using a freshman CS student as the intended audience. This
+was a heuristic review, not an observed human usability study. Findings and the
+real-user follow-up scenario are recorded in APP_PLAN.md.
+
+- 61 Python tests pass, including saved export destination/time and partial disk
+  discovery when a volume disconnects. Existing RAW, matching, export, cache,
+  companion and cleanup checks remain green.
+- 26 Chromium/WebKit scenarios pass. New checks cover unsaved review selections
+  through Next, Escape, outside click and close; saving versus discarding; visible
+  save errors; restored keyboard focus; custom-layout editor focus; and narrow
+  screens with all modal actions visible and no stale toast covering them.
+- WCAG-tagged automated checks pass on the tested screens. This is not full
+  accessibility conformance certification.
+- A second visual review confirmed the output action, saved-checklist scope,
+  source-only warning, source context, custom-layout guidance, and unsaved actions
+  are readable and discoverable at desktop and narrow sizes.
+- TypeScript/Vite builds, workflow validation and whitespace checks pass.
+- The local Apple Silicon app/installer is rebuilt for 0.3.1. It uses development
+  signing; public signing/notarization and native Windows/Intel checks remain
+  release work. No new runtime dependency was added for this UX pass.
+
+Primary fixes: plain-language onboarding with correct RAW capabilities, explicit
+include/leave-at-source meaning, saved-selection guard, scaled-preview labels,
+nonexistent output-folder instructions, working custom mode, export-only settings
+scope, early library access and source warnings, dated snapshot limits, and
+readable recovery when a disk disappears during discovery.
+
+Current artifact: dist/Photo-Dedup-0.3.1-macos-arm64.dmg.
+
+---
+
+# Previous verification — 0.3.0 / 2026-10-30
 
 This version adds decoded RAW sample evidence and generated renders, an optional
 bounded deeper photo pass, output layout templates, local volume capability checks

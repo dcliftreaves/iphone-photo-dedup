@@ -121,6 +121,12 @@ function Photo({
     </div>
   );
 }
+const layoutPresets = [
+  "{camera}/{capture_month}/{stem}{ext}",
+  "{year}/{month}/{stem}{ext}",
+  "{date}/{camera}/{stem}{ext}",
+];
+type ReviewExit = { kind: "close" } | { kind: "group"; id: string };
 const initialSettings = {
   workers: 4,
   threshold: 0.02,
@@ -144,6 +150,16 @@ function App() {
   const [group, setGroup] = useState<Group | null>(null),
     [selected, setSelected] = useState<string[]>([]),
     [zoom, setZoom] = useState(1);
+  const [pendingExit, setPendingExit] = useState<ReviewExit | null>(null);
+  const pendingHeading = useRef<HTMLHeadingElement>(null);
+  const firstCheckbox = useRef<HTMLInputElement>(null);
+  const selectionChanged =
+    !!group &&
+    (selected.length !== group.selected.length ||
+      selected.some((id) => !group.selected.includes(id)));
+  useEffect(() => {
+    if (pendingExit) pendingHeading.current?.focus();
+  }, [pendingExit]);
   const [job, setJob] = useState<Job | null>(null),
     [busy, setBusy] = useState(false),
     [loadingGroups, setLoadingGroups] = useState(false),
@@ -178,6 +194,13 @@ function App() {
       return "{camera}/{capture_month}/{stem}{ext}";
     }
   });
+  const templateInput = useRef<HTMLInputElement>(null);
+  const [customLayout, setCustomLayout] = useState(
+    () => !layoutPresets.includes(template),
+  );
+  useEffect(() => {
+    if (customLayout) templateInput.current?.focus();
+  }, [customLayout]);
   useEffect(() => {
     setPlan(null);
     try {
@@ -394,11 +417,13 @@ function App() {
       session_id: session.id,
       group_id: id,
     });
+    setPendingExit(null);
+    setNotice("");
     setGroup(g);
     setSelected(g.selected);
     setZoom(1);
   };
-  const save = async (action: string, choice = selected) => {
+  const save = async (action: string, choice = selected, next?: ReviewExit) => {
     if (!session || !group) return;
     await rpc("decide", {
       session_id: session.id,
@@ -406,10 +431,16 @@ function App() {
       action,
       selected: choice,
     });
-    setGroup(null);
+    setPendingExit(null);
+    if (next?.kind === "group") await openGroup(next.id);
+    else setGroup(null);
     setSession(await rpc<Session>("session", { session_id: session.id }));
     await refreshSessions();
-    setNotice("Choice saved. Your originals are unchanged.");
+    setNotice(
+      next?.kind === "group"
+        ? ""
+        : "Selection saved. Your originals are unchanged.",
+    );
   };
   const undo = () =>
     perform(async () => {
@@ -425,10 +456,20 @@ function App() {
           : "No review choices to undo.",
       );
     });
+  const finishExit = async (exit: ReviewExit) => {
+    setPendingExit(null);
+    if (exit.kind === "group") await openGroup(exit.id);
+    else setGroup(null);
+  };
+  const requestExit = (exit: ReviewExit) => {
+    if (busy || pendingExit) return;
+    if (selectionChanged) setPendingExit(exit);
+    else void perform(() => finishExit(exit));
+  };
   const navigateGroup = (delta: number) => {
     const index = groups.findIndex((g) => g.id === group?.id);
     const next = groups[index + delta];
-    if (next) void perform(() => openGroup(next.id));
+    if (next) requestExit({ kind: "group", id: next.id });
   };
   const syncScroll = (index: number, element: HTMLDivElement) => {
     if (scrollLock.current) return;
@@ -591,7 +632,7 @@ function App() {
               </button>
             </div>
           )}
-          {notice && (
+          {notice && !group && !info && (
             <div className="toast" role="status">
               <CheckCircle2 size={17} />
               {notice}
@@ -712,8 +753,8 @@ function App() {
                         {prepError ||
                           (sourcePrep
                             ? sourcePrep.same_filesystem
-                              ? "These import folders share one filesystem. Put the output on this volume too; it must support hard links."
-                              : "These imports span filesystems. Gather them on one working volume for efficient hard links, or explicitly use independent copies."
+                              ? "These import folders are on the same volume. Create the new library on this volume too. Check hard-link support below before scanning."
+                              : "These import folders are on different volumes. Copy them onto one working volume for space-saving hard links, or choose independent copies when building the library."
                             : "Checking the locations of your import folders…")}
                       </p>
                     </div>
@@ -738,6 +779,10 @@ function App() {
                   </button>
                   {advanced && (
                     <div className="settings">
+                      <p className="settings-note">
+                        Leave these defaults for your first scan. These options
+                        trade scan speed for more detailed comparisons.
+                      </p>
                       <label>
                         Disk access
                         <select
@@ -756,8 +801,10 @@ function App() {
                       </label>
                       <label>
                         <span>
-                          Visual threshold{" "}
-                          <small>Similar matches always need review</small>
+                          Allowed image difference{" "}
+                          <small>
+                            Lower = stricter. Leave 0.02 for your first scan.
+                          </small>
                         </span>
                         <input
                           type="number"
@@ -889,21 +936,21 @@ function App() {
                     {view === "review"
                       ? "REVIEW REPEATED IMPORTS BEFORE CONSOLIDATING"
                       : view === "export"
-                        ? "BUILD THE CANONICAL ARCHIVE"
+                        ? "BUILD YOUR ORGANIZED LIBRARY"
                         : "EVERY FILE ACCOUNTED FOR"}
                   </div>
                   <h1>
                     {view === "review"
                       ? "Review your imports."
                       : view === "export"
-                        ? "Build the canonical library."
+                        ? "Build your organized library."
                         : "Nothing left unexplained."}
                   </h1>
                   <p>
                     {view === "review"
                       ? session.name
                       : view === "export"
-                        ? "Your chosen layout, retained companions, and a complete audit. Source cleanup comes afterward."
+                        ? "Your chosen layout, related media files, and a report of scanned entries. Source cleanup comes afterward."
                         : "Unsupported files and metadata warnings are listed here for review."}
                   </p>
                 </div>
@@ -1020,6 +1067,14 @@ function App() {
                           </div>
                         </div>
                       </section>
+                      <p className="match-legend">
+                        <strong>Identical:</strong> same file contents.{" "}
+                        <strong>Similar:</strong> looks alike.{" "}
+                        <strong>Possible:</strong> capture information agrees,
+                        but content is unverified.{" "}
+                        <strong>No match found:</strong> this scan did not find
+                        a match; duplicates may still exist.
+                      </p>
                       <div className="results-toolbar">
                         <div className="tabs" aria-label="Filter match groups">
                           {[
@@ -1028,7 +1083,7 @@ function App() {
                             ["visual", "Similar"],
                             ["metadata", "Possible"],
                             ["reviewed", "Reviewed"],
-                            ["unique", "Unique"],
+                            ["unique", "No match found"],
                           ].map(([key, label]) => (
                             <button
                               key={key}
@@ -1057,7 +1112,7 @@ function App() {
                         <span>
                           {loadingGroups
                             ? "Loading matches…"
-                            : `${total} ${filter === "unique" ? "unique files" : "match groups"}`}
+                            : `${total} ${filter === "unique" ? "files with no match found" : "match groups"}`}
                           <span className="muted"> · largest groups first</span>
                         </span>
                         <label className="search">
@@ -1080,12 +1135,12 @@ function App() {
                             {query
                               ? "No matches for that search."
                               : filter === "all"
-                                ? "Everything has its own place."
+                                ? "No matches found with these scan settings."
                                 : "Nothing in this view."}
                           </h2>
                           <p>
                             {filter === "all"
-                              ? "No duplicate groups were found. You can still create an organized copy of your library."
+                              ? "No groups were found with these settings. Renamed files or missing capture dates can hide matches. For more photo candidates, start a new scan with “Find more matches by image content” in Scan preferences. You can still build a library from this scan."
                               : "Try another filter or search."}
                           </p>
                         </div>
@@ -1240,13 +1295,30 @@ function App() {
                           <CheckCheck size={35} />
                         </span>
                         <h2>We don't delete anything</h2>
-                        <h3>Your canonical library is built.</h3>
+                        <h3>Your organized library is built.</h3>
                         <p>
                           The old import folders still exist. Inspect the new
                           library and account for files left behind before
                           removing them yourself.
                         </p>
                         <code>{exported}</code>
+                        <button
+                          className="button primary"
+                          onClick={() =>
+                            void perform(async () => {
+                              await reveal(exported);
+                              if (!native)
+                                setNotice("Export path copied to clipboard.");
+                            })
+                          }
+                        >
+                          <FolderOpen size={17} />
+                          {native
+                            ? "Show in Finder / Explorer"
+                            : "Copy folder path"}
+                        </button>
+
+                        <CleanupReview sessionId={session.id} />
                         <div className="cleanup-next">
                           <h3>Finish the consolidation</h3>
                           <ol>
@@ -1273,22 +1345,6 @@ function App() {
                           </p>
                         </div>
 
-                        <CleanupReview sessionId={session.id} />
-                        <button
-                          className="button primary"
-                          onClick={() =>
-                            void perform(async () => {
-                              await reveal(exported);
-                              if (!native)
-                                setNotice("Export path copied to clipboard.");
-                            })
-                          }
-                        >
-                          <FolderOpen size={17} />
-                          {native
-                            ? "Show in Finder / Explorer"
-                            : "Copy folder path"}
-                        </button>
                         <button
                           className="text-button"
                           onClick={() => {
@@ -1307,8 +1363,9 @@ function App() {
                           <div>
                             <h2>Choose a new home</h2>
                             <p>
-                              Choose a new sibling folder on the same volume as
-                              your imports.
+                              Name a new folder outside your import folders. The
+                              app creates it for you; don’t create it in Finder
+                              or Explorer first.
                             </p>
                           </div>
                         </div>
@@ -1318,14 +1375,17 @@ function App() {
                         <div className="export-input">
                           <input
                             id="export-path"
-                            placeholder="Path to a new, empty destination…"
+                            placeholder="Full path including a new folder name…"
+                            aria-describedby="destination-help"
+                            disabled={isRunning}
                             value={destination}
                             onChange={(e) => setDestination(e.target.value)}
                           />
                           {native && (
                             <button
-                              aria-label="Choose parent folder"
-                              className="icon-button"
+                              aria-label="Choose containing folder"
+                              className="button secondary"
+                              disabled={isRunning}
                               onClick={() =>
                                 void perform(async () => {
                                   const p = await pickDirectory();
@@ -1338,10 +1398,16 @@ function App() {
                                 })
                               }
                             >
-                              <FolderOpen size={20} />
+                              <FolderOpen size={20} /> Choose containing folder…
                             </button>
                           )}
                         </div>
+                        <p id="destination-help" className="field-help">
+                          For example: Imports and Photo Dedup Library can sit
+                          beside each other on your media volume. The new
+                          library must not be inside a folder you scanned. Hard
+                          links need both on the same volume.
+                        </p>
                         <div className="mode-options">
                           <label
                             className={mode === "hardlink" ? "checked" : ""}
@@ -1406,22 +1472,22 @@ function App() {
                         )}
                         <div className="output-structure">
                           <h3>Choose your folder structure</h3>
+                          <p>
+                            Selections and layout changes affect your next
+                            export. They do not update a library you already
+                            created. To include newly added imports, scan again
+                            and build a new library.
+                          </p>
                           <label>
                             Layout preset
                             <select
+                              aria-label="Layout preset"
                               disabled={isRunning}
-                              value={
-                                [
-                                  "{camera}/{capture_month}/{stem}{ext}",
-                                  "{year}/{month}/{stem}{ext}",
-                                  "{date}/{camera}/{stem}{ext}",
-                                ].includes(template)
-                                  ? template
-                                  : "custom"
-                              }
+                              value={customLayout ? "custom" : template}
                               onChange={(e) => {
-                                if (e.target.value !== "custom")
-                                  setTemplate(e.target.value);
+                                const custom = e.target.value === "custom";
+                                setCustomLayout(custom);
+                                if (!custom) setTemplate(e.target.value);
                               }}
                             >
                               <option value="{camera}/{capture_month}/{stem}{ext}">
@@ -1436,26 +1502,35 @@ function App() {
                               <option value="custom">Custom template</option>
                             </select>
                           </label>
-                          <label>
-                            Output template
-                            <input
-                              disabled={isRunning}
-                              value={template}
-                              onChange={(e) => setTemplate(e.target.value)}
-                              spellCheck={false}
-                            />
-                          </label>
-                          <p>
-                            Tokens:{" "}
-                            <code>
-                              {
-                                "{camera} {capture_month} {year} {month} {day} {date} {stem} {ext} {kind}"
-                              }
-                            </code>
-                            . Use / for folders. End with {"{stem}{ext}"} or
-                            another filename containing {"{stem}"} and ending in{" "}
-                            {"{ext}"}. The extension includes its dot.
-                          </p>
+                          {customLayout && (
+                            <>
+                              <label>
+                                Output template
+                                <input
+                                  ref={templateInput}
+                                  disabled={isRunning}
+                                  value={template}
+                                  onChange={(e) => setTemplate(e.target.value)}
+                                  spellCheck={false}
+                                />
+                              </label>
+                              <p>
+                                Examples: {"{stem}"} means the filename without
+                                its extension; {"{ext}"} includes the dot, such
+                                as .jpg; {"{kind}"} is image, raw, or video.
+                                Tokens:{" "}
+                                <code>
+                                  {
+                                    "{camera} {capture_month} {year} {month} {day} {date} {stem} {ext} {kind}"
+                                  }
+                                </code>
+                                . Use / for folders. End with {"{stem}{ext}"} or
+                                another filename containing {"{stem}"} and
+                                ending in {"{ext}"}. The extension includes its
+                                dot.
+                              </p>
+                            </>
+                          )}
                           <code>
                             curated/{template}
                             <br />
@@ -1587,7 +1662,7 @@ function App() {
                   <div className="export-explainer">
                     <ShieldCheck size={29} />
                     <h2>
-                      One canonical structure.
+                      One organized library.
                       <br />
                       Your cleanup comes next.
                     </h2>
@@ -1628,7 +1703,7 @@ function App() {
       <Dialog.Root
         open={!!group}
         onOpenChange={(open) => {
-          if (!open) setGroup(null);
+          if (!open) requestExit({ kind: "close" });
         }}
       >
         <Dialog.Portal>
@@ -1653,7 +1728,11 @@ function App() {
                 <button
                   className="icon-button"
                   aria-label="Previous group"
-                  disabled={groups.findIndex((g) => g.id === group?.id) <= 0}
+                  disabled={
+                    busy ||
+                    !!pendingExit ||
+                    groups.findIndex((g) => g.id === group?.id) <= 0
+                  }
                   onClick={() => navigateGroup(-1)}
                 >
                   <ChevronLeft size={19} />
@@ -1662,8 +1741,10 @@ function App() {
                   className="icon-button"
                   aria-label="Next group"
                   disabled={
+                    busy ||
+                    !!pendingExit ||
                     groups.findIndex((g) => g.id === group?.id) >=
-                    groups.length - 1
+                      groups.length - 1
                   }
                   onClick={() => navigateGroup(1)}
                 >
@@ -1672,6 +1753,7 @@ function App() {
                 <Dialog.Close
                   className="icon-button"
                   aria-label="Close comparison"
+                  disabled={busy || !!pendingExit}
                 >
                   <X size={21} />
                 </Dialog.Close>
@@ -1681,9 +1763,22 @@ function App() {
               id="compare-description"
               className="compare-description"
             >
-              Choose the files for your new library. Your originals stay
-              untouched. At least one file stays in every group.
+              Check the files to include in the new library, then click Save
+              selection. Unchecked files stay in the source folders. Nothing is
+              deleted. Keep at least one file per group. Related Live Photo and
+              edit files may also be included; the export preview shows the
+              final list.
             </Dialog.Description>
+            {notice && (
+              <p className="comparison-notice" role="status">
+                {notice}
+              </p>
+            )}
+            {error && (
+              <p className="comparison-error" role="alert">
+                {error}
+              </p>
+            )}
             {group && session && (
               <>
                 <div className="compare-tools">
@@ -1711,7 +1806,7 @@ function App() {
                   <label>
                     <ZoomIn size={16} />
                     <input
-                      aria-label="Comparison zoom"
+                      aria-label="Preview zoom"
                       type="range"
                       min="1"
                       max="3"
@@ -1719,9 +1814,13 @@ function App() {
                       value={zoom}
                       onChange={(e) => setZoom(Number(e.target.value))}
                     />
-                    {Math.round(zoom * 100)}%
+                    {zoom === 1 ? "Fit" : `${zoom}×`}
                   </label>
                 </div>
+                <p className="preview-scope">
+                  Scaled previews, up to 1,600 pixels. Use “Show original” below
+                  a file to check its full resolution.
+                </p>
                 <div className="compare-files">
                   {group.records.map((r, i) => (
                     <article
@@ -1732,14 +1831,17 @@ function App() {
                         <label>
                           <input
                             type="checkbox"
+                            ref={i === 0 ? firstCheckbox : undefined}
                             checked={selected.includes(r.id)}
-                            onChange={(e) =>
+                            disabled={busy || !!pendingExit}
+                            onChange={(e) => {
+                              setNotice("");
                               setSelected((s) =>
                                 e.target.checked
                                   ? [...s, r.id]
                                   : s.filter((id) => id !== r.id),
-                              )
-                            }
+                              );
+                            }}
                           />
                           <strong>{basename(r.path)}</strong>
                         </label>
@@ -1748,6 +1850,30 @@ function App() {
                             <Sparkles size={11} /> Suggested
                           </span>
                         )}
+                      </div>
+                      <div className="source-context">
+                        <small title={r.path}>
+                          {r.path.split(/[\\/]/).slice(-3, -1).join(" / ") ||
+                            r.path}
+                        </small>
+                        <span>
+                          {selected.includes(r.id)
+                            ? "Include in new library"
+                            : "Leave at source"}
+                        </span>
+                        <button
+                          className="text-button"
+                          onClick={() =>
+                            void perform(async () => {
+                              await reveal(r.path);
+                              if (!native)
+                                setNotice("File path copied to clipboard.");
+                            })
+                          }
+                        >
+                          {native ? "Show original" : "Copy path"}{" "}
+                          <FolderOpen size={13} />
+                        </button>
                       </div>
                       <div
                         className="compare-photo"
@@ -1853,36 +1979,89 @@ function App() {
                     </article>
                   ))}
                 </div>
-                <div className="compare-footer">
-                  <div>
-                    <button
-                      className="button secondary"
-                      disabled={busy}
-                      onClick={() => void perform(() => save("keep_all"))}
-                    >
-                      Keep all
-                    </button>
-                    <button
-                      className="text-button"
-                      disabled={busy}
-                      onClick={() => void perform(() => save("not_duplicates"))}
-                    >
-                      These aren’t duplicates
-                    </button>
+                {pendingExit ? (
+                  <div className="compare-footer unsaved-review" role="alert">
+                    <div>
+                      <h3 ref={pendingHeading} tabIndex={-1}>
+                        Your selection has not been saved
+                      </h3>
+                      <p>
+                        Save it before leaving, or discard these checkbox
+                        changes.
+                      </p>
+                    </div>
+                    <div className="unsaved-actions">
+                      <button
+                        className="text-button"
+                        disabled={busy}
+                        onClick={() => {
+                          setPendingExit(null);
+                          requestAnimationFrame(() =>
+                            firstCheckbox.current?.focus(),
+                          );
+                        }}
+                      >
+                        Keep reviewing
+                      </button>
+                      <button
+                        className="button secondary"
+                        disabled={busy}
+                        onClick={() =>
+                          void perform(() => finishExit(pendingExit))
+                        }
+                      >
+                        Discard changes
+                      </button>
+                      <button
+                        className="button primary"
+                        disabled={busy || !selected.length}
+                        onClick={() =>
+                          void perform(() =>
+                            save("keep_selected", selected, pendingExit),
+                          )
+                        }
+                      >
+                        Save and continue
+                      </button>
+                    </div>
                   </div>
-                  <div>
-                    <span className="muted">
-                      {selected.length} of {group.records.length} selected
-                    </span>
-                    <button
-                      className="button primary"
-                      disabled={busy || !selected.length}
-                      onClick={() => void perform(() => save("keep_selected"))}
-                    >
-                      Save choice <Check size={16} />
-                    </button>
+                ) : (
+                  <div className="compare-footer">
+                    <div>
+                      <button
+                        className="button secondary"
+                        disabled={busy}
+                        onClick={() => void perform(() => save("keep_all"))}
+                      >
+                        Keep all
+                      </button>
+                      <button
+                        className="text-button"
+                        disabled={busy}
+                        onClick={() =>
+                          void perform(() => save("not_duplicates"))
+                        }
+                      >
+                        These aren’t duplicates
+                      </button>
+                    </div>
+                    <div>
+                      <span className="muted">
+                        {selected.length} included ·{" "}
+                        {group.records.length - selected.length} left at source
+                      </span>
+                      <button
+                        className="button primary"
+                        disabled={busy || !selected.length}
+                        onClick={() =>
+                          void perform(() => save("keep_selected"))
+                        }
+                      >
+                        Save selection <Check size={16} />
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
               </>
             )}
           </Dialog.Content>

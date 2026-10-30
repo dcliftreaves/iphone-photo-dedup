@@ -452,7 +452,7 @@ class AppService:
                 self.db.execute('INSERT OR REPLACE INTO cleanup_snapshots VALUES (?,?)',
                                 (session_id, json.dumps(self._cleanup_records(manifest, plan))))
             session.update(state='ready', last_export=str(Path(destination).expanduser().resolve()),
-                           last_export_mode=mode, last_export_template=template)
+                           last_export_mode=mode, last_export_template=template, last_export_at=now())
             session.pop('error', None)
             session.pop('pending_export', None)
             self._save_session(session)
@@ -480,6 +480,7 @@ class AppService:
             roots.append(dict(path=root, files=len(members), at_risk=sum(r['disposition'] == 'not_retained' for r in members)))
         offset, limit = max(0, int(offset)), min(100, max(1, int(limit)))
         return dict(roots=roots, items=omitted[offset:offset + limit], total=len(omitted),
+                    destination=session["last_export"], exported_at=session.get("last_export_at"),
                     retained=sum(r['disposition'] == 'retained' for r in records),
                     identical_retained=sum(r['disposition'] == 'identical_retained' for r in records),
                     message='Saved export evidence, not a fresh disk audit. Files added or changed after the scan are not covered. '

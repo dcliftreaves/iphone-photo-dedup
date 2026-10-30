@@ -139,7 +139,9 @@ test("pass 2: compare, save, undo, reopen, and verified export", async ({
     fullPage: true,
     animations: "disabled",
   });
-  await page.getByRole("button", { name: "Save choice", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Save selection", exact: true })
+    .click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.locator(".reviewed-badge")).toHaveCount(1);
   await page.reload();
@@ -149,7 +151,9 @@ test("pass 2: compare, save, undo, reopen, and verified export", async ({
   await page.getByRole("button", { name: "Similar", exact: true }).click();
   await page.locator(".group-card").first().click();
   await page.getByRole("checkbox").nth(1).uncheck();
-  await page.getByRole("button", { name: "Save choice", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Save selection", exact: true })
+    .click();
   await page
     .getByRole("main")
     .getByRole("button", { name: "Create library", exact: true })
@@ -167,7 +171,7 @@ test("pass 2: compare, save, undo, reopen, and verified export", async ({
   });
   await page.getByRole("button", { name: "Create my library" }).click();
   await expect(
-    page.getByRole("heading", { name: "Your canonical library is built." }),
+    page.getByRole("heading", { name: "Your organized library is built." }),
   ).toBeVisible();
   const manifest = JSON.parse(
     await readFile(join(destination, "manifest.json"), "utf8"),
@@ -179,7 +183,7 @@ test("pass 2: compare, save, undo, reopen, and verified export", async ({
     "manually remove the old import files",
   );
   await expect(page.locator(".cleanup-review")).toContainText(
-    "without a retained byte-identical counterpart",
+    "need attention before deleting this folder",
   );
   await expect(page.locator(".cleanup-next")).toContainText(
     "Removing an old source path leaves its retained library link intact",
@@ -254,12 +258,12 @@ test("pass 4: comparison keyboard focus, zero selection, zoom, and image details
   await page.getByRole("checkbox").nth(0).uncheck();
   await page.getByRole("checkbox").nth(1).uncheck();
   await expect(
-    page.getByRole("button", { name: "Save choice", exact: true }),
+    page.getByRole("button", { name: "Save selection", exact: true }),
   ).toBeDisabled();
-  await page.getByRole("slider", { name: "Comparison zoom" }).focus();
+  await page.getByRole("slider", { name: "Preview zoom" }).focus();
   await page.keyboard.press("ArrowRight");
   await expect(
-    page.getByRole("slider", { name: "Comparison zoom" }),
+    page.getByRole("slider", { name: "Preview zoom" }),
   ).not.toHaveValue("1");
   await expect(
     page.getByRole("dialog").locator(".file-details .file-path"),
@@ -274,6 +278,12 @@ test("pass 4: comparison keyboard focus, zero selection, zoom, and image details
     animations: "disabled",
   });
   await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("heading", { name: "Your selection has not been saved" }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Discard changes", exact: true })
+    .click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(first).toBeFocused();
 });
@@ -289,11 +299,13 @@ test("pass 5: empty folders, completed zero-file scans, and compact navigation",
   await page.getByLabel("Folder path").fill(empty);
   await page.getByRole("button", { name: "Choose a folder" }).click();
   await expect(page.locator(".source-preparation")).toContainText(
-    "share one filesystem",
+    "on the same volume",
   );
   await page.getByRole("button", { name: "Scan imports" }).click();
   await expect(
-    page.getByRole("heading", { name: "Everything has its own place." }),
+    page.getByRole("heading", {
+      name: "No matches found with these scan settings.",
+    }),
   ).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("button", { name: "Toggle navigation" }).click();
@@ -390,7 +402,7 @@ test("first-run guide explains the niche, one-volume prep, output, and manual cl
   const guide = page.getByRole("dialog");
   await expect(
     guide.getByRole("heading", {
-      name: "Years of imports. One canonical library.",
+      name: "Years of imports. One organized library.",
     }),
   ).toBeVisible();
   await expect(guide).toContainText("Windows import");
@@ -430,7 +442,7 @@ test("first-run guide explains the niche, one-volume prep, output, and manual cl
   await page.getByRole("button", { name: "Guide & help" }).click();
   await expect(
     page.getByRole("heading", {
-      name: "Years of imports. One canonical library.",
+      name: "Years of imports. One organized library.",
     }),
   ).toBeVisible();
 });
@@ -523,6 +535,12 @@ test("custom output layouts and saved source cleanup are understandable at deskt
   await page
     .getByLabel("New library folder")
     .fill(join(appServer.data, "Templated library"));
+  await page
+    .getByLabel("Layout preset", { exact: true })
+    .selectOption("custom");
+  await expect(
+    page.getByLabel("Output template", { exact: true }),
+  ).toBeFocused();
   await page
     .getByLabel("Output template", { exact: true })
     .fill("../{stem}{ext}");
@@ -642,4 +660,114 @@ test("RAW review shows decoded renders and distinguishes sensor evidence from fi
     path: join(appServer.data, "16-raw-sample-review.png"),
     fullPage: true,
   });
+});
+
+test("unsaved selections survive navigation attempts until explicitly saved or discarded", async ({
+  page,
+  appServer,
+}) => {
+  await startDemo(page, appServer.url);
+  await page.getByRole("button", { name: "Similar", exact: true }).click();
+  const first = page.locator(".group-card").first();
+  await first.click();
+  const title = await page
+    .getByRole("dialog")
+    .getByRole("heading", { level: 2 })
+    .innerText();
+  await expect(page.getByRole("dialog")).toContainText(
+    "Unchecked files stay in the source folders",
+  );
+  await page.getByRole("checkbox").nth(1).uncheck();
+  await page.getByRole("button", { name: "Next group", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Your selection has not been saved" }),
+  ).toBeFocused();
+  let failSave = true;
+  await page.route("**/api/rpc", async (route) => {
+    if (route.request().postDataJSON().method === "decide" && failSave) {
+      failSave = false;
+      await route.fulfill({
+        json: { error: "Could not save this selection. Please try again." },
+      });
+    } else await route.continue();
+  });
+  await page
+    .getByRole("button", { name: "Save and continue", exact: true })
+    .click();
+  await expect(page.locator(".comparison-error")).toContainText(
+    "Could not save this selection",
+  );
+  await expect(
+    page.getByRole("heading", { name: "Your selection has not been saved" }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Keep reviewing", exact: true })
+    .click();
+  await expect(page.getByRole("checkbox").first()).toBeFocused();
+  await expect(page.getByRole("checkbox").nth(1)).not.toBeChecked();
+  await page.mouse.click(3, 3);
+  await expect(
+    page.getByRole("heading", { name: "Your selection has not been saved" }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Keep reviewing", exact: true })
+    .click();
+  await page.keyboard.press("Escape");
+  await page
+    .getByRole("button", { name: "Discard changes", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await first.click();
+  await expect(page.getByRole("checkbox").nth(1)).toBeChecked();
+  await page.getByRole("checkbox").nth(1).uncheck();
+  await page.getByRole("button", { name: "Next group", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Save and continue", exact: true })
+    .click();
+  await expect(
+    page.getByRole("dialog").getByRole("heading", { level: 2 }),
+  ).not.toHaveText(title);
+  await page
+    .getByRole("button", { name: "Previous group", exact: true })
+    .click();
+  await expect(page.getByRole("checkbox").nth(1)).not.toBeChecked();
+  await page.getByRole("checkbox").nth(1).check();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page
+    .getByRole("button", { name: "Close comparison", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Your selection has not been saved" }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.getByRole("dialog").evaluate(async (el) => {
+    await Promise.all(
+      el.getAnimations().map((a) => a.finished.catch(() => {})),
+    );
+  });
+  const audit = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+    .analyze();
+  expect(
+    audit.violations.map((v) => ({
+      id: v.id,
+      nodes: v.nodes.map((n) => n.target),
+    })),
+  ).toEqual([]);
+  await expect(page.locator(".toast")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Save and continue", exact: true }),
+  ).toBeInViewport();
+  await page.screenshot({
+    path: join(appServer.data, "17-unsaved-selection.png"),
+    fullPage: true,
+  });
+  await page
+    .getByRole("button", { name: "Discard changes", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 });

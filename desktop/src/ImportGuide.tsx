@@ -17,7 +17,7 @@ export const GUIDE_KEY = "photo-dedup-import-guide-v2";
 const steps = [
   {
     label: "Why it exists",
-    title: "Years of imports. One canonical library.",
+    title: "Years of imports. One organized library.",
     icon: Layers2,
   },
   {
@@ -27,7 +27,7 @@ const steps = [
   },
   {
     label: "Review & build",
-    title: "An opinionated structure, not a folder mirror.",
+    title: "Choose files, then build an organized library.",
     icon: FolderTree,
   },
   {
@@ -127,27 +127,42 @@ export function ImportGuide({
                     transfers can accumulate the same way.
                   </p>
                   <p>
-                    Photo Dedup brings those loose files into one opinionated
-                    structure. It compares whole-file fingerprints, image
-                    appearance where supported, and capture metadata.{" "}
+                    Photo Dedup brings those loose files into one organized
+                    library. It compares file contents, image appearance where
+                    supported, and capture information such as camera and date.{" "}
                     <strong>
                       Similar appearance or matching metadata does not prove two
                       files are interchangeable.
                     </strong>
                   </p>
                   <div className="guide-callout">
-                    <strong>This is an archive-consolidation workflow.</strong>
+                    <strong>Built for years of repeated imports.</strong>
                     <span>
                       It does not edit your media, clean an Apple Photos
-                      library, or automatically delete old imports. Videos and
-                      RAW files currently use byte and metadata matching; their
-                      content is not visually verified.
+                      library, or automatically delete old imports. Videos use
+                      file contents and capture information; video frames are
+                      not compared. Supported RAW photos also have generated
+                      previews and sensor-data comparisons. Similar matches
+                      still need your review.
                     </span>
                   </div>
                 </div>
               )}
               {step === 1 && (
                 <div className="guide-body">
+                  <p>
+                    A volume is a storage location shown separately in Finder or
+                    Explorer, such as Macintosh HD or a USB drive. One physical
+                    disk can contain several volumes.
+                  </p>
+                  <div className="guide-callout">
+                    <strong>Start with a backup and ordinary folders.</strong>
+                    <span>
+                      If your media is in Apple Photos, export unmodified
+                      originals first. This app works with folders of files, not
+                      the Photos library itself.
+                    </span>
+                  </div>
                   <ol>
                     <li>
                       Copy the old Mac, Windows, phone, and SD-card imports onto
@@ -166,19 +181,16 @@ export function ImportGuide({
                   </ol>
                   <pre className="guide-tree">{`Media volume/\n  Imports/                 ← scan this folder\n    Old Mac downloads/\n    Windows downloads/\n    SD-card transfers/\n  Canonical library/       ← created by the app`}</pre>
                   <p className="guide-small">
-                    One physical disk can contain multiple volumes; hard links
-                    cannot cross between them. The volume must support hard
-                    links. APFS, Mac OS Extended (HFS+) and NTFS support them;
-                    exFAT and FAT32 do not. Cross-disk or unsupported-volume
-                    workflows require independent copies and enough space for
-                    another copy of the selected media.
+                    Gathering imports from other disks needs enough space for
+                    those copies. Hard links save space when building the
+                    organized library afterward. They cannot cross between
+                    volumes.
                   </p>
                   <DiskCheck />
                   <p className="guide-small">
-                    If the media is in Apple Photos, export unmodified originals
-                    into ordinary folders first. Work from a verified backup; a
-                    hard-linked library on the same disk is not a separate
-                    backup.
+                    Keep a verified backup on another disk. A hard-linked
+                    library shares the same underlying files and is not a
+                    separate backup.
                   </p>
                 </div>
               )}
@@ -186,9 +198,10 @@ export function ImportGuide({
                 <div className="guide-body">
                   <ol>
                     <li>
-                      <strong>Scan imports.</strong> Identical bytes can use a
-                      suggested representative. Review similar photos and
-                      metadata-only matches; keep both when uncertain.
+                      <strong>Scan imports.</strong> Identical files can use a
+                      suggested file to keep. Review similar photos and matches
+                      based only on capture information; keep both when
+                      uncertain.
                     </li>
                     <li>
                       <strong>Choose what to retain.</strong> Suggestions help
@@ -203,9 +216,11 @@ export function ImportGuide({
                     </li>
                   </ol>
                   <p>
-                    You can choose a layout preset or build a template from
-                    camera, capture date, filename and other tokens. Curated and
-                    review categories remain separate.
+                    Start with the default camera-and-month layout, or choose
+                    another preset. You can customize it before building. Both
+                    output folders are part of your new library: curated/ holds
+                    selected files; review/ holds extra candidates you haven’t
+                    decided on yet.
                   </p>
                   <p>
                     Hard links build a new way to view your existing files: a
@@ -217,11 +232,11 @@ export function ImportGuide({
                   </p>
                   <pre className="guide-tree">{`Canonical library/\n  curated/<camera>/<YYYY-MM>/…\n  review/<camera>/<YYYY-MM>/…\n  manifest.json   files.csv   summary.txt`}</pre>
                   <p className="guide-small">
-                    Unresolved similar and possible matches remain in review/.
-                    Missing dates use Unknown-date. Sidecars and associated
-                    companions are preserved where identified; inspect the
-                    manifest. Unsupported files and read errors are listed, not
-                    exported.
+                    You can build the library without reviewing every group:
+                    similar and possible matches are included together by
+                    default. Extra identical copies are left out. Missing dates
+                    use Unknown-date. Unrecognized or unreadable files are
+                    listed in the cleanup checklist and are not included.
                   </p>
                   <div className="guide-callout">
                     <strong>Hard links share file contents.</strong>

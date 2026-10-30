@@ -20,12 +20,22 @@ def support(filesystem):
 def local_volumes():
     """Only local block devices; never traverse or probe network mounts."""
     results = []
+    unavailable = 0
     if sys.platform == 'darwin':
         def diskutil(*args):
-            return plistlib.loads(subprocess.check_output(['diskutil', *args], timeout=15))
-        listing = diskutil('list', '-plist')
+            return plistlib.loads(subprocess.check_output(['/usr/sbin/diskutil', *args], timeout=15, stderr=subprocess.DEVNULL))
+        try:
+            listing = diskutil('list', '-plist')
+        except (OSError, ValueError, subprocess.SubprocessError) as error:
+            raise ValueError('Could not read the local disk list. Reconnect your drive and try again, or test a chosen folder directly.') from error
         for identifier in listing.get('AllDisks', []):
-            info = diskutil('info', '-plist', identifier)
+            try:
+                info = diskutil('info', '-plist', identifier)
+            except (OSError, ValueError, subprocess.SubprocessError):
+                # Volumes can disconnect between listing and inspection. Preserve
+                # the remaining results without guessing this volume's capability.
+                unavailable += 1
+                continue
             mount = info.get('MountPoint')
             if not mount or info.get('NetworkMount', False):
                 continue
@@ -64,7 +74,8 @@ def local_volumes():
                                 read_only='ro' in fields[5].split(','),
                                 evidence='Local mount filesystem type; folder permissions are not tested.'))
     return dict(volumes=sorted({r['path']: r for r in results}.values(), key=lambda r: r['path']),
-                message='Local mounted volumes only. No media was read and no test files were written.')
+                message=('Local mounted volumes only. No media was read and no test files were written.' +
+                         (f' {unavailable} disk(s) could not be checked; they may have disconnected. Check again or test a folder directly.' if unavailable else '')))
 
 
 def test_folder(path):

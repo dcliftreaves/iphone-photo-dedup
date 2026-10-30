@@ -132,5 +132,5 @@ export const kindLabel: Record<string, string> = {
   exact: "Identical files",
   visual: "Similar photos",
   metadata: "Possible matches",
-  unique: "Unique files",
+  unique: "No match found",
 };

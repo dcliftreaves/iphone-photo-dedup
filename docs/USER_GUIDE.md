@@ -72,7 +72,7 @@ general-purpose near-duplicate search.
 Compare groups side by side and select files for the canonical library. Keep both
 when uncertain. You must retain at least one file in every group. **Keep all** and
 **These aren't duplicates** retain the whole group with different explanations.
-**Save choice** persists the selection; **Undo** reverses the latest saved choice.
+**Save selection** persists the selection; **Undo** reverses the latest saved choice.
 
 ## 3. Build the canonical directory structure
 
@@ -156,3 +156,17 @@ scripts/run_desktop.py keep it in this checkout under local-validation/app-data.
 The demo uses synthetic media and is for learning the workflow.
 
 Hard-link semantics are described in [Microsoft's filesystem documentation](https://learn.microsoft.com/en-us/windows/win32/fileio/hard-links-and-junctions).
+
+Review checkboxes mean **include in the new library**, not delete. Unchecked files
+stay in the source folders. If you close a comparison or move to another group
+with changed checkboxes, choose Save and continue, Discard changes, or Keep reviewing.
+Previews are scaled, up to 1,600 pixels; Fit is not a one-to-one view of source pixels.
+Use Show original to inspect full detail in your normal photo viewer.
+
+The output folder must not already exist. Choose its containing folder, then give
+the new library a name; the app creates it. Start with a layout preset. Select
+Custom template only if you want to edit the token-based layout.
+
+The cleanup checklist is saved when the export completes. Its destination and
+completion time identify the export; the files are not rechecked when you reopen
+it. Inspect the current library, sources and backup before deleting old folders.

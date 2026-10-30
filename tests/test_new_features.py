@@ -151,6 +151,8 @@ def test_app_raw_preview_custom_export_and_cleanup_persist(tmp_path, monkeypatch
         assert all((tmp_path/'output'/r['destination']).is_file() for r in preview['records'])
         assert 'cleanup_records' not in with_app.session(session)  # history responses stay small
         review=with_app.cleanup_review(session)
+        assert review['destination'] == str(tmp_path/'output')
+        assert review['exported_at']
         assert review['total']==2  # rewritten RAW has distinct file metadata; never call it safely discarded
         assert review['roots'][0]['at_risk']==2
     finally:with_app.close()
@@ -187,3 +189,19 @@ def test_detected_media_kind_can_override_a_misleading_extension(tmp_path):
     disguised_png=tmp_path/'old-import.dng'
     Image.new('RGB',(40,30)).save(disguised_png,format='PNG')
     assert open_normalized(disguised_png,raw=False).size == (40,30)
+
+
+def test_disconnected_volume_does_not_hide_other_disk_results(monkeypatch):
+    import plistlib
+    import subprocess
+    from photo_dedup.volumes import local_volumes
+    monkeypatch.setattr('photo_dedup.volumes.sys.platform','darwin')
+    def result(command,**kwargs):
+        if command[1]=='list':return plistlib.dumps(dict(AllDisks=['disk1','disk2']))
+        if command[-1]=='disk2':raise subprocess.CalledProcessError(1,command)
+        return plistlib.dumps(dict(MountPoint='/Volumes/Working',FilesystemType='apfs',WritableVolume=True))
+    monkeypatch.setattr('photo_dedup.volumes.subprocess.check_output',result)
+    found=local_volumes()
+    assert len(found['volumes']) == 1
+    assert found['volumes'][0]['supported'] is True
+    assert '1 disk(s) could not be checked' in found['message']
