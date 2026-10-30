@@ -19,7 +19,7 @@ def summary(manifest):
         omitted = sum(r.get("export_selected") is False and r["status"] not in {"ignored", "error"}
                       for r in records)
         lines += [f"Selected for this export: {selected}",
-                  f"Alternatives left only in source folders: {omitted}",
+                  f"Unselected alternatives (may include identical retained copies): {omitted}",
                   f"Review groups with saved choices: {len(manifest['review']['decisions'])}"]
     # Hard-linked aliases do not represent additional occupied file data.
     kept_inodes = {(r.get("device"), r.get("inode")) for r in records
@@ -34,7 +34,7 @@ def summary(manifest):
               f"Cached inspections reused: {manifest['cache_hits']}",
               "", "Exact duplicate = identical file bytes (SHA-256).",
               "Needs review = visual similarity or metadata agreement; keep both until reviewed.",
-              "Sidecars and Live Photo / RAW companions are preserved.",
+              "Sidecars and Live Photo / RAW companions are preserved unless a reviewed RAW/image alternative was explicitly omitted.",
               "No source files were modified or deleted."]
     if not manifest["options"]["exiftool"]:
         lines += ["", "ExifTool was not found. Video/RAW metadata and Live Photo identification",
@@ -53,6 +53,12 @@ def write_reports(manifest, directory):
     directory = Path(directory)
     (directory / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=True) + "\n")
     (directory / "summary.txt").write_text(summary(manifest))
+    cleanup = manifest.get("cleanup_review")
+    if cleanup:
+        with (directory / "source-cleanup.csv").open("w", newline="", encoding="utf-8") as stream:
+            writer = csv.DictWriter(stream, fieldnames=["path", "disposition", "size", "status", "reason"])
+            writer.writeheader()
+            writer.writerows({key: csv_cell(value) for key, value in row.items()} for row in cleanup["records"])
     columns = ["path", "status", "confidence", "reason", "matched_to", "group_id", "size",
                "captured_at", "kind", "score", "related_files", "warnings", "export_selected", "export_path"]
     with (directory / "files.csv").open("w", newline="", encoding="utf-8") as stream:

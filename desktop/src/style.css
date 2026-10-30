@@ -1503,7 +1503,7 @@ main {
 .file-details {
   padding: 17px;
 }
-.file-details > div:first-child {
+.file-details > div:first-of-type {
   display: flex;
   gap: 13px;
   align-items: center;
@@ -2717,3 +2717,33 @@ main {
     max-width: 100%;
   }
 }
+
+.disk-check { border: 1px solid var(--border, #dce2dc); border-radius: 12px; padding: 14px 16px; margin: 16px 0; background: #f7f9f5; font-size: 13px; line-height: 1.55; }
+.disk-check summary { cursor: pointer; font-weight: 650; }
+.disk-check p { margin: 12px 0; }
+.disk-check input, .output-structure input, .output-structure select { width: 100%; min-width: 0; margin: 7px 0 12px; padding: 10px; border: 1px solid #aebcaf; border-radius: 7px; background: white; color: #253c32; }
+.disk-check label, .output-structure label { display: block; font-size: 13px; font-weight: 600; }
+.volume-list, .cleanup-roots, .cleanup-files { list-style: none; padding: 0; margin: 14px 0; }
+.volume-list li { display: flex; gap: 10px; padding: 12px 0; border-bottom: 1px solid #dce2dc; }
+.volume-list svg { flex-shrink: 0; margin-top: 3px; }
+.volume-list small, .volume-list span { display: block; }
+.volume-list div, .cleanup-roots span, .cleanup-files div { min-width: 0; overflow-wrap: anywhere; }
+.settings-note { font-size: 12px; line-height: 1.6; color: #52645a; }
+.output-structure code { display: block; white-space: normal; overflow-wrap: anywhere; font-size: 12px; }
+.output-structure p code { display: inline; }
+.cleanup-review { text-align: left; margin: 24px 0; padding: 22px; border: 1px solid #d3ddd4; border-radius: 12px; background: #fafbf8; }
+.cleanup-review h4 { margin: 22px 0 8px; }
+.cleanup-review p { font-size: 13px; line-height: 1.6; }
+.cleanup-roots li, .cleanup-files li { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; border-bottom: 1px solid #dce2dc; padding: 14px 0; font-size: 13px; }
+.cleanup-review small { display: block; margin-top: 6px; }
+.cleanup-review .button { flex-shrink: 0; }
+.cleanup-pages { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; }
+@media (max-width: 600px) { .cleanup-review { padding: 14px; } .cleanup-roots li, .cleanup-files li { flex-direction: column; } .disk-check .button { white-space: normal; } }
+.planned-paths { margin-bottom: 20px; font-size: 13px; }
+.planned-paths summary { cursor: pointer; font-weight: 600; }
+.planned-paths ul { max-height: 280px; overflow: auto; padding: 0; list-style: none; }
+.planned-paths li { padding: 8px 0; border-bottom: 1px solid #dce2dc; }
+.planned-paths small, .planned-paths code { display: block; overflow-wrap: anywhere; }
+.export-explainer { align-self: start; }
+.cleanup-review small { color: #52645a; font-weight: 400; line-height: 1.5; }
+.raw-render-note { font-size: 12px; color: #52645a; }

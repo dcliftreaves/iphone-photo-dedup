@@ -11,6 +11,7 @@ import unicodedata
 
 from .media import SUPPORTED, sha256
 from .reports import write_reports
+from .layout import DEFAULT_TEMPLATE, render_template, validate_template
 
 
 def safe_component(text):
@@ -47,6 +48,7 @@ def load_manifest(path):
 
 
 def plan_export(manifest):
+    template = validate_template(manifest.get("layout", {}).get("template", DEFAULT_TEMPLATE))
     plan = {}
     used = set()
     by_path = {r["path"]: r for r in manifest["records"]}
@@ -59,10 +61,9 @@ def plan_export(manifest):
             record["status"], "curated")
         if record.get("review_decision") and record.get("export_selected"):
             bucket = "curated"
-        date = record.get("captured_at") or ""
-        month = date[:4] + "-" + date[5:7] if re.match(r"\d{4}:\d{2}:", date) else "Unknown-date"
-        parent = Path(bucket) / safe_component(record.get("model", "Unknown")) / month
-        filename = safe_component(source.stem) + record.get("extension", source.suffix.lower())
+        relative = render_template(record, template)
+        parent = Path(bucket) / relative.parent
+        filename = relative.name
         if record["status"] == "sidecar":
             # Keep sidecars beside their local media, including collision-renamed media.
             local = [r for r in record.get("related_files", [])
@@ -86,6 +87,24 @@ def plan_export(manifest):
         used.add(unicodedata.normalize("NFC", str(target)).casefold())
         plan[record["path"]] = target
     return plan
+
+
+def cleanup_records(manifest, plan):
+    """Snapshot of what the successful export preserved, with byte-level evidence."""
+    retained_hashes = {r.get('sha256') for r in manifest['records'] if r['path'] in plan}
+    result = []
+    for record in manifest['records']:
+        if record['path'] in plan:
+            disposition, reason = 'retained', 'Included in the new library.'
+        elif record.get('sha256') and record['sha256'] in retained_hashes:
+            disposition, reason = 'identical_retained', 'An identical byte-for-byte copy is included in the new library.'
+        else:
+            disposition = 'not_retained'
+            reason = ('Not included. Deleting the source folder may lose this file or its distinct contents. '
+                      + record.get('reason', ''))
+        result.append(dict(path=record['path'], size=record.get('size', 0),
+                           disposition=disposition, reason=reason, status=record['status']))
+    return result
 
 
 def verified_source(record):
@@ -153,6 +172,8 @@ def export_manifest(manifest, destination, *, mode="hardlink", dry_run=False, pr
             record["export_path"] = str(relative)
             if progress:
                 progress(record["path"])
+        manifest["cleanup_review"] = dict(roots=manifest["roots"], records=cleanup_records(manifest, plan),
+                                        scope="Saved scan evidence; files added or changed later are not covered. Ignored directories may contain uncounted files.")
         manifest["export"] = dict(mode=mode, destination=str(destination))
         write_reports(manifest, staging)
         if destination.exists() or destination.is_symlink():

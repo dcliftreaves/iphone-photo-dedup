@@ -35,6 +35,11 @@ on the same volume as every retained source for the efficient hard-link workflow
 One physical disk can have multiple filesystems; being on the same hardware is
 not sufficient. The setup screen checks whether source folders share a filesystem;
 that read-only check does not prove the volume supports creating hard links.
+APFS, Mac OS Extended (HFS+) and NTFS support them; exFAT and FAT32 do not.
+Open **Which disks support hard links?** for a read-only list of local disks.
+The optional folder test creates and cleans a tiny temporary file and link, only
+after you click the test button. Choose a folder through the native picker if
+the OS needs you to grant access. A permission error means unverified support.
 
 If the media is in Apple Photos, export unmodified originals to ordinary folders
 first. The app does not enter or edit Photos library bundles. Copies left on other
@@ -54,8 +59,13 @@ are saved locally.
 
 HEIC/JPEG transitions and repeated downloads can change bytes or metadata. The
 suggested representative is a heuristic, not certification of the original capture.
-Videos and RAW files currently use byte and metadata matching, without visual
-content verification. Missing or changed metadata and unrelated filenames can
+Videos use byte and metadata matching, without visual content verification.
+Supported RAW files are decoded with LibRaw: identical active sensor samples and
+similar generated sRGB renders are separate review evidence classes. Equal sensor
+samples do not imply identical file metadata or rendering instructions. Unsupported
+RAW variants remain intact with warnings. The optional deeper photo pass in Scan
+settings finds content candidates beyond names and capture dates; it skips video
+and is bounded, not exhaustive. Missing or changed metadata and unrelated filenames can
 also cause equivalent files to remain separate. This is not an exhaustive,
 general-purpose near-duplicate search.
 
@@ -69,7 +79,9 @@ when uncertain. You must retain at least one file in every group. **Keep all** a
 Choose **Create library**, specify the new same-volume output folder, and preview
 the plan. Hard links are the default for this consolidation workflow: the new
 library gets new directory entries for retained media without another copy of its
-file data. Media is not re-encoded and embedded metadata is not rewritten.
+file data. Think of it as a selected set of file copies that take no additional
+media space: a new way to view the data you already have. Folders and reports use
+a little additional space. It does not include every source file. Media is not re-encoded and embedded metadata is not rewritten.
 
 **Hard links share contents:** editing a retained file through either path can
 affect both. Removing an old source path leaves the retained library link intact.
@@ -88,6 +100,12 @@ Canonical library/
   summary.txt
 ```
 
+The default organization is shown above. You can choose a preset or enter a
+relative token template in the export screen, then preview actual paths. For
+example, `{year}/{month}/{stem}{ext}` uses year/month folders. Supported tokens are
+`{camera}`, `{capture_month}`, `{year}`, `{month}`, `{day}`, `{date}`, `{stem}`,
+`{ext}`, and `{kind}`. `{ext}` includes the dot. Category folders stay fixed.
+
 This is an opinionated organization, not a mirror of the old import folders.
 Missing camera/date information uses Unknown / Unknown-date. Explicitly retained
 review candidates go into curated/. Unresolved similar or possible matches remain
@@ -105,9 +123,16 @@ Each exported file is verified against its scan fingerprint. If a source changed
 scan again. Failed/cancelled exports remove owned partial output. On restart, the
 app can recover marked staging folders left by an abrupt exit.
 
-## 4. Verify, then manually remove the old source files
+## 4. We don't delete anything
 
-Building the output does not delete or move the old imports. To finish:
+Building the output does not delete or move the old imports. The source cleanup
+review links to your top-level input folders in Finder/Explorer and lists files
+without a retained byte-identical counterpart. An omitted exact copy is accounted
+for separately from an omitted visual alternative, unsupported file, or read error.
+Reopen this review from **Review the last export and source cleanup** later.
+The manifest and source-cleanup.csv also preserve it. This is saved scan/export
+evidence, not a fresh disk audit: later additions/changes and files inside ignored
+directories are not covered. To finish:
 
 1. Open curated/ and review/, spot-check photos and videos, inspect camera/date
    placement, and verify the backup of the collection you intend to retain.

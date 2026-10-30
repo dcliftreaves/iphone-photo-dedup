@@ -43,12 +43,14 @@ def parser():
     scan_cmd.add_argument("--workers", type=positive_int, default=min(4, os.cpu_count() or 1), help="Concurrent inspection workers (default: up to 4; use 1 for HDDs)")
     scan_cmd.add_argument("--threshold", type=threshold_value, default=0.02, help="Visual RMSE limit, 0–1 (default: 0.02); all visual matches need review")
     scan_cmd.add_argument("--full-images", action="store_true", help="Compare all normalized pixels instead of 128px thumbnails; uses more memory")
+    scan_cmd.add_argument("--deep-scan", action="store_true", help="Find additional photo candidates by content, regardless of name/date; review required; skips video")
     scan_cmd.add_argument("--exclude", action="append", type=Path, default=[], help="Exclude a file or directory (repeatable)")
     scan_cmd.add_argument("--quiet", action="store_true", help="Hide progress")
     export_cmd = commands.add_parser("export", help="Export a saved scan into a new curated/review directory")
     export_cmd.add_argument("manifest", type=Path)
     export_cmd.add_argument("-o", "--output", type=Path, required=True, help="New destination outside input directories")
     export_cmd.add_argument("--mode", choices=["hardlink", "copy"], default="hardlink")
+    export_cmd.add_argument("--template", default=None, help="Relative output template, e.g. {year}/{month}/{stem}{ext}; review categories stay fixed")
     export_cmd.add_argument("--dry-run", action="store_true", help="Verify and preview export without writing")
     commands.add_parser("doctor", help="Check Python, image decoders, and optional ExifTool")
     ui = commands.add_parser("ui", help="Open the local graphical review application")
@@ -92,7 +94,7 @@ def run_scan(args):
             last_percent = percent
 
     manifest = scan(roots, cache_path=cache_path, excludes=excludes, workers=args.workers,
-                    threshold=args.threshold, full_images=args.full_images, progress=progress)
+                    threshold=args.threshold, full_images=args.full_images, deep_scan=args.deep_scan, progress=progress)
     if not args.quiet:
         print("\nMatching complete.", file=sys.stderr)
     print(summary(manifest), end="")
@@ -122,6 +124,8 @@ def main(argv=None):
             return run_scan(args)
         if args.command == "export":
             manifest = load_manifest(args.manifest)
+            if args.template is not None:
+                manifest["layout"] = dict(template=args.template)
             plan = export_manifest(manifest, args.output.expanduser(), mode=args.mode, dry_run=args.dry_run)
             if args.dry_run:
                 for source, destination in plan.items():

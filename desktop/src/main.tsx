@@ -50,6 +50,8 @@ import {
 import "./style.css";
 import { version as appVersion } from "../package.json";
 import { ImportGuide, GUIDE_KEY } from "./ImportGuide";
+import { DiskCheck } from "./DiskCheck";
+import { CleanupReview } from "./CleanupReview";
 
 function Landscape({ variant = 0 }: { variant?: number }) {
   const colors = [
@@ -119,7 +121,12 @@ function Photo({
     </div>
   );
 }
-const initialSettings = { workers: 4, threshold: 0.02, full_images: false };
+const initialSettings = {
+  workers: 4,
+  threshold: 0.02,
+  full_images: false,
+  deep_scan: false,
+};
 
 function App() {
   const [sessions, setSessions] = useState<Session[]>([]),
@@ -161,6 +168,22 @@ function App() {
     [mode, setMode] = useState("hardlink"),
     [plan, setPlan] = useState<Plan | null>(null),
     [exported, setExported] = useState("");
+  const [template, setTemplate] = useState(() => {
+    try {
+      return (
+        localStorage.getItem("photo-dedup-template") ||
+        "{camera}/{capture_month}/{stem}{ext}"
+      );
+    } catch {
+      return "{camera}/{capture_month}/{stem}{ext}";
+    }
+  });
+  useEffect(() => {
+    setPlan(null);
+    try {
+      localStorage.setItem("photo-dedup-template", template);
+    } catch {}
+  }, [template]);
   const [sourcePrep, setSourcePrep] = useState<{
     same_filesystem: boolean;
   } | null>(null);
@@ -764,8 +787,33 @@ function App() {
                         Compare full images{" "}
                         <small>Slower; uses more memory</small>
                       </label>
+                      <label className="checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={settings.deep_scan}
+                          onChange={(e) =>
+                            setSettings({
+                              ...settings,
+                              deep_scan: e.target.checked,
+                            })
+                          }
+                        />{" "}
+                        Find more matches by image content{" "}
+                        <small>
+                          Optional deeper photo pass; ignores names and dates,
+                          skips video. All suggestions need review.
+                        </small>
+                      </label>
+                      <p className="settings-note">
+                        RAW files are decoded locally when supported. Matching
+                        sensor samples and similar renders have separate
+                        evidence labels. Unsupported RAW files stay intact with
+                        a warning. RAW previews are generated renders, not the
+                        camera’s embedded JPEG.
+                      </p>
                     </div>
                   )}
+                  <DiskCheck />
                   <div className="start-actions">
                     <span>
                       {roots.length
@@ -855,7 +903,7 @@ function App() {
                     {view === "review"
                       ? session.name
                       : view === "export"
-                        ? "Camera/month folders, retained companions, and a complete audit. Source cleanup comes afterward."
+                        ? "Your chosen layout, retained companions, and a complete audit. Source cleanup comes afterward."
                         : "Unsupported files and metadata warnings are listed here for review."}
                   </p>
                 </div>
@@ -1191,7 +1239,8 @@ function App() {
                         <span>
                           <CheckCheck size={35} />
                         </span>
-                        <h2>Your canonical library is built.</h2>
+                        <h2>We don't delete anything</h2>
+                        <h3>Your canonical library is built.</h3>
                         <p>
                           The old import folders still exist. Inspect the new
                           library and account for files left behind before
@@ -1217,20 +1266,14 @@ function App() {
                             </li>
                           </ol>
                           <p>
-                            {exportDetails?.mode === "hardlink"
-                              ? "This export uses hard links: removing an old source path leaves its retained library link intact. Shared content can still be changed through either remaining path."
+                            {(exportDetails?.mode ||
+                              session.last_export_mode) === "hardlink"
+                              ? "The new directory gives retained files another name on the same volume without copying their media data. It uses very little extra space for folders and reports. Removing an old source path leaves its retained library link intact. Editing shared content through either path changes both."
                               : "This export uses independent copies. Verify those copies before removing the old sources."}
-                          </p>
-                          <p>
-                            <strong>Left only at source:</strong>{" "}
-                            {exportDetails?.omitted ?? 0} unselected
-                            alternatives; {exportDetails?.ignored ?? 0}{" "}
-                            unsupported entries; {exportDetails?.errors ?? 0}{" "}
-                            read errors. Do not delete source trees wholesale
-                            without accounting for these.
                           </p>
                         </div>
 
+                        <CleanupReview sessionId={session.id} />
                         <button
                           className="button primary"
                           onClick={() =>
@@ -1350,17 +1393,80 @@ function App() {
                             <Copy size={19} />
                           </label>
                         </div>
+                        {session.last_export && (
+                          <button
+                            className="button secondary full"
+                            onClick={() => {
+                              setExported(session.last_export!);
+                              setExportDetails(null);
+                            }}
+                          >
+                            Review the last export and source cleanup
+                          </button>
+                        )}
                         <div className="output-structure">
-                          <h3>The structure you get</h3>
+                          <h3>Choose your folder structure</h3>
+                          <label>
+                            Layout preset
+                            <select
+                              disabled={isRunning}
+                              value={
+                                [
+                                  "{camera}/{capture_month}/{stem}{ext}",
+                                  "{year}/{month}/{stem}{ext}",
+                                  "{date}/{camera}/{stem}{ext}",
+                                ].includes(template)
+                                  ? template
+                                  : "custom"
+                              }
+                              onChange={(e) => {
+                                if (e.target.value !== "custom")
+                                  setTemplate(e.target.value);
+                              }}
+                            >
+                              <option value="{camera}/{capture_month}/{stem}{ext}">
+                                Camera / capture month / filename
+                              </option>
+                              <option value="{year}/{month}/{stem}{ext}">
+                                Year / month / filename
+                              </option>
+                              <option value="{date}/{camera}/{stem}{ext}">
+                                Date / camera / filename
+                              </option>
+                              <option value="custom">Custom template</option>
+                            </select>
+                          </label>
+                          <label>
+                            Output template
+                            <input
+                              disabled={isRunning}
+                              value={template}
+                              onChange={(e) => setTemplate(e.target.value)}
+                              spellCheck={false}
+                            />
+                          </label>
+                          <p>
+                            Tokens:{" "}
+                            <code>
+                              {
+                                "{camera} {capture_month} {year} {month} {day} {date} {stem} {ext} {kind}"
+                              }
+                            </code>
+                            . Use / for folders. End with {"{stem}{ext}"} or
+                            another filename containing {"{stem}"} and ending in{" "}
+                            {"{ext}"}. The extension includes its dot.
+                          </p>
                           <code>
-                            curated/&lt;camera&gt;/&lt;YYYY-MM&gt;/…
+                            curated/{template}
                             <br />
-                            review/&lt;camera&gt;/&lt;YYYY-MM&gt;/…
+                            review/{template}
                           </code>
                           <p>
-                            Uncertain retained matches stay in review/. Missing
-                            dates use Unknown-date. The manifest, CSV, and
-                            summary explain every source file.
+                            The review categories stay fixed. Missing dates use
+                            Unknown-date or Unknown-year/month/day. Preview
+                            below shows actual paths before anything is written.
+                            Sidecars follow their media; collisions get a
+                            numbered suffix.
                           </p>
                         </div>
                         <button
@@ -1373,6 +1479,7 @@ function App() {
                                   session_id: session.id,
                                   destination,
                                   mode,
+                                  template,
                                 }),
                               ),
                             )
@@ -1383,6 +1490,26 @@ function App() {
                         {plan && (
                           <div className="export-plan">
                             <h3>Here’s what will happen</h3>
+                            <details className="planned-paths">
+                              <summary>
+                                Preview actual output paths (
+                                {plan.records.length} files)
+                              </summary>
+                              <ul>
+                                {plan.records.slice(0, 100).map((r) => (
+                                  <li key={r.source}>
+                                    <small>{basename(r.source)}</small>
+                                    <code>{r.destination}</code>
+                                  </li>
+                                ))}
+                              </ul>
+                              {plan.records.length > 100 && (
+                                <p>
+                                  Showing the first 100 paths. The completed
+                                  manifest records every output path.
+                                </p>
+                              )}
+                            </details>
                             <div>
                               <span>Files in the new library</span>
                               <strong>{plan.files}</strong>
@@ -1397,7 +1524,8 @@ function App() {
                             </div>
                             <div>
                               <span>
-                                Alternatives left only in their source folders
+                                Unselected alternatives (including identical
+                                copies)
                               </span>
                               <strong>{plan.omitted}</strong>
                             </div>
@@ -1435,6 +1563,7 @@ function App() {
                                       session_id: session.id,
                                       destination,
                                       mode,
+                                      template,
                                     },
                                   );
                                   setJob(
@@ -1562,11 +1691,22 @@ function App() {
                     <ShieldCheck size={15} />{" "}
                     {group.records.some((r) => r.confidence === "metadata_only")
                       ? "Metadata agrees. Media content is not verified."
-                      : group.records.some(
-                            (r) => r.confidence === "visual_similarity",
+                      : group.records.some((r) =>
+                            [
+                              "visual_similarity",
+                              "raw_samples",
+                              "raw_render_similarity",
+                              "deep_visual_similarity",
+                            ].includes(r.confidence),
                           )
-                        ? "Similar appearance. Check detail and edits before choosing."
-                        : "Identical SHA-256 fingerprints. The file bytes match."}
+                        ? group.records.some(
+                            (r) => r.confidence === "raw_samples",
+                          )
+                          ? "RAW sample evidence. Check metadata and each file’s matching evidence before choosing."
+                          : "Similar appearance. Check detail and edits before choosing."
+                        : group.records.length > 1
+                          ? "Identical SHA-256 fingerprints. The file bytes match."
+                          : "No duplicate was confirmed for this file."}
                   </span>
                   <label>
                     <ZoomIn size={16} />
@@ -1635,6 +1775,13 @@ function App() {
                         </div>
                       </div>
                       <div className="file-details">
+                        {r.kind === "raw" && (
+                          <p className="raw-render-note">
+                            Generated RAW render · camera white balance, sRGB.
+                            Embedded camera previews are not used for
+                            verification.
+                          </p>
+                        )}
                         <div>
                           <strong>{r.extension.toUpperCase().slice(1)}</strong>
                           <span>
@@ -1645,13 +1792,20 @@ function App() {
                           <span>{formatBytes(r.size)}</span>
                         </div>
                         <p>
-                          {r.id === group.recommendation
-                            ? "Suggested by format, filename, and file date. Original status is unverified."
-                            : r.confidence === "visual_similarity"
-                              ? "These photos look alike. Edits, fine detail, or metadata may differ."
-                              : r.confidence === "exact_bytes"
-                                ? "This file has exactly the same bytes as its matching representative."
-                                : "Capture metadata agrees. The media content has not been verified."}
+                          {r.confidence === "raw_samples"
+                            ? "Decoded active RAW samples match. Metadata and rendering instructions may differ."
+                            : [
+                                  "raw_render_similarity",
+                                  "deep_visual_similarity",
+                                ].includes(r.confidence)
+                              ? r.reason
+                              : r.id === group.recommendation
+                                ? "Suggested by format, filename, and file date. Original status is unverified."
+                                : r.confidence === "visual_similarity"
+                                  ? "These photos look alike. Edits, fine detail, or metadata may differ."
+                                  : r.confidence === "exact_bytes"
+                                    ? "This file has exactly the same bytes as its matching representative."
+                                    : "Capture metadata agrees. The media content has not been verified."}
                         </p>
                         <small className="capture-details">
                           {r.model && r.model !== "Unknown"

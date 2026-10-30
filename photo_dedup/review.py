@@ -46,6 +46,9 @@ def apply_decisions(manifest, decisions):
             # a requirement to export every duplicate component in every import.
             if Path(other["path"]).parent != Path(record["path"]).parent:
                 continue
+            if (related.get("relationship") == "raw_jpeg_pair" and other.get("review_decision")
+                    and other.get("group_id") == record.get("group_id")):
+                continue
             if not other["export_selected"]:
                 other["export_selected"] = True
                 other["preserved_as_companion"] = True

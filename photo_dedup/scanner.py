@@ -50,7 +50,7 @@ def inventory(roots, excludes):
 
 
 def scan(roots, *, cache_path=None, excludes=(), workers=4, threshold=0.02,
-         full_images=False, progress=None, cancel_event=None):
+         full_images=False, deep_scan=False, progress=None, cancel_event=None):
     def check_cancel():
         if cancel_event is not None and cancel_event.is_set():
             raise CancelledError("Scan cancelled; cached inspections are available for a restart")
@@ -115,7 +115,7 @@ def scan(roots, *, cache_path=None, excludes=(), workers=4, threshold=0.02,
                     if progress:
                         progress(len(records), len(entries), cache.hits)
         check_cancel()
-        classify(records, threshold, full_images, check_cancel=check_cancel)
+        classify(records, threshold, full_images, check_cancel=check_cancel, deep_scan=deep_scan)
         records.sort(key=lambda r: r["path"])
         for record in records:
             record.pop("thumbnail", None)
@@ -123,7 +123,7 @@ def scan(roots, *, cache_path=None, excludes=(), workers=4, threshold=0.02,
         return dict(schema_version=1, created_at=datetime.now(timezone.utc).isoformat(),
                     roots=[str(r) for r in roots],
                     options=dict(threshold=threshold, comparison="full" if full_images else "thumbnail",
-                                 workers=workers, exiftool=bool(executable)),
+                                 workers=workers, exiftool=bool(executable), deep_scan=deep_scan, raw_verification=True),
                     cache_hits=cache.hits, records=records)
     finally:
         cache.close()

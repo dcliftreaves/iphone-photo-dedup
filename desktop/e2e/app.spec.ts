@@ -1,6 +1,6 @@
 import { test as base, expect, Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
 import { mkdir, mkdtemp, readFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
 
@@ -178,11 +178,11 @@ test("pass 2: compare, save, undo, reopen, and verified export", async ({
   await expect(page.locator(".cleanup-next")).toContainText(
     "manually remove the old import files",
   );
-  await expect(page.locator(".cleanup-next")).toContainText(
-    "unsupported entries",
+  await expect(page.locator(".cleanup-review")).toContainText(
+    "without a retained byte-identical counterpart",
   );
   await expect(page.locator(".cleanup-next")).toContainText(
-    "removing an old source path leaves its retained library link intact",
+    "Removing an old source path leaves its retained library link intact",
   );
   expect(errors).toEqual([]);
 });
@@ -468,4 +468,178 @@ test("first-run guide remains navigable on a small window", async ({
     .getByRole("button", { name: "Ready to prepare my media" })
     .click();
   await expect(guide).toHaveCount(0);
+});
+
+test("disk checks explain capability, test a chosen folder, and clean up", async ({
+  page,
+  appServer,
+}) => {
+  await page.goto(appServer.url);
+  await page.getByRole("button", { name: "Close import guide" }).click();
+  await page
+    .getByText("Which disks support hard links?", { exact: true })
+    .click();
+  await expect(page.locator(".disk-check")).toContainText(
+    "exFAT and FAT32 do not",
+  );
+  await page
+    .getByRole("button", { name: "Check local disks", exact: true })
+    .click();
+  await expect(page.locator(".disk-check [role=status]")).toContainText(
+    "No media was read",
+    { timeout: 20000 },
+  );
+  await page.getByLabel("Folder to test").fill(appServer.data);
+  await page
+    .getByRole("button", { name: "Test hard links in this folder" })
+    .click();
+  await expect(page.locator(".disk-check [role=status]")).toContainText(
+    "Temporary test files were removed",
+  );
+  const audit = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+    .analyze();
+  expect(
+    audit.violations.map((v) => ({
+      id: v.id,
+      nodes: v.nodes.map((n) => n.target),
+    })),
+  ).toEqual([]);
+  await page.screenshot({
+    path: join(appServer.data, "12-disk-check.png"),
+    fullPage: true,
+  });
+});
+
+test("custom output layouts and saved source cleanup are understandable at desktop and phone sizes", async ({
+  page,
+  appServer,
+}) => {
+  await startDemo(page, appServer.url);
+  await page
+    .getByRole("main")
+    .getByRole("button", { name: "Create library", exact: true })
+    .click();
+  await page
+    .getByLabel("New library folder")
+    .fill(join(appServer.data, "Templated library"));
+  await page
+    .getByLabel("Output template", { exact: true })
+    .fill("../{stem}{ext}");
+  await page.getByRole("button", { name: "Preview my library" }).click();
+  await expect(page.getByRole("alert")).toContainText("cannot contain");
+  await page
+    .getByLabel("Output template", { exact: true })
+    .fill("{kind}/{year}/{stem}{ext}");
+  await page.getByRole("button", { name: "Preview my library" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Here’s what will happen" }),
+  ).toBeVisible();
+  await page.getByText("Preview actual output paths", { exact: false }).click();
+  await expect(page.locator(".planned-paths")).toContainText("Unknown-year");
+  await page.screenshot({
+    path: join(appServer.data, "13-custom-layout.png"),
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Create my library" }).click();
+  await expect(
+    page.getByRole("heading", {
+      name: "We don't delete anything",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(page.locator(".cleanup-review")).toContainText(
+    "1 omitted copy has identical bytes",
+  );
+  await expect(page.locator(".cleanup-files")).toContainText("readme.txt");
+  await expect(page.locator(".cleanup-review")).toContainText(
+    "Files added or changed after the scan are not covered",
+  );
+  const audit = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+    .analyze();
+  expect(
+    audit.violations.map((v) => ({
+      id: v.id,
+      nodes: v.nodes.map((n) => n.target),
+    })),
+  ).toEqual([]);
+  await page.screenshot({
+    path: join(appServer.data, "14-cleanup-desktop.png"),
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: join(appServer.data, "15-cleanup-compact.png"),
+    fullPage: true,
+  });
+  await page.reload();
+  await page
+    .getByRole("main")
+    .getByRole("button", { name: "Create library", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Review the last export and source cleanup" })
+    .click();
+  await expect(page.locator(".cleanup-files")).toContainText("readme.txt");
+});
+
+test("RAW review shows decoded renders and distinguishes sensor evidence from file identity", async ({
+  page,
+  appServer,
+}) => {
+  const inputs = join(appServer.data, "RAW imports");
+  await mkdir(inputs);
+  const python =
+    process.platform === "win32"
+      ? join(root, ".venv/Scripts/python.exe")
+      : join(root, ".venv/bin/python");
+  execFileSync(
+    python,
+    [
+      "-c",
+      'from pathlib import Path; import sys; from scripts.synthetic_dng import make_dng; root=Path(sys.argv[1]); make_dng(root/"original.dng"); make_dng(root/"rewritten.dng", "changed file metadata")',
+      inputs,
+    ],
+    { cwd: root },
+  );
+  await page.goto(appServer.url);
+  await page.getByRole("button", { name: "Close import guide" }).click();
+  await page.getByLabel("Folder path").fill(inputs);
+  await page
+    .getByRole("button", { name: "Choose a folder", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Scan imports", exact: true }).click();
+  await expect(page.locator(".group-card")).toHaveCount(1);
+  await expect(page.locator(".group-card img")).toHaveCount(1);
+  await page.locator(".group-card").click();
+  await expect(page.getByRole("dialog")).toContainText("RAW sample evidence");
+  await expect(page.locator(".compare-file img")).toHaveCount(2);
+  await expect(page.locator(".raw-render-note")).toHaveCount(2);
+  await expect(page.getByRole("dialog")).toContainText(
+    "Metadata and rendering instructions may differ",
+  );
+  await page.getByRole("dialog").evaluate(async (el) => {
+    await Promise.all(
+      el.getAnimations().map((animation) => animation.finished.catch(() => {})),
+    );
+  });
+  const audit = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+    .analyze();
+  expect(
+    audit.violations.map((v) => ({
+      id: v.id,
+      nodes: v.nodes.map((n) => n.target),
+    })),
+  ).toEqual([]);
+  await page.screenshot({
+    path: join(appServer.data, "16-raw-sample-review.png"),
+    fullPage: true,
+  });
 });

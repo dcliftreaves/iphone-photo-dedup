@@ -71,7 +71,7 @@ def main():
     subprocess.run([sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean', '--onedir',
                     '--name', 'photo-dedup-engine', '--distpath', str(ROOT/'dist'),
                     '--workpath', str(ROOT/'build'/'pyinstaller'), '--specpath', str(ROOT/'build'),
-                    '--paths', str(ROOT), '--collect-all', 'pillow_heif',
+                    '--paths', str(ROOT), '--collect-all', 'pillow_heif', '--collect-all', 'rawpy', '--copy-metadata', 'rawpy',
                     '--collect-submodules', 'PIL', '--copy-metadata', 'pillow-heif',
                     '--copy-metadata', 'Pillow', '--copy-metadata', 'numpy',
                     '--add-data', f'{ROOT/"LICENSE"}{os.pathsep}licenses',

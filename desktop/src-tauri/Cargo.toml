@@ -1,6 +1,6 @@
 [package]
 name = "photo-dedup"
-version = "0.2.1"
+version = "0.3.0"
 description = "A local, thoughtful photo duplicate review app"
 authors = ["David Clift-Reaves"]
 edition = "2021"

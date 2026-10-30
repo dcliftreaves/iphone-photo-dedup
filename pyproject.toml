@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "iphone-photo-dedup"
-version = "0.2.1"
+version = "0.3.0"
 description = "Explainable, local photo and video duplicate review"
 requires-python = ">=3.10"
-dependencies = ["Pillow>=10.4", "numpy>=1.26", "pillow-heif>=0.20"]
+dependencies = ["Pillow>=10.4", "numpy>=1.26", "pillow-heif>=0.20", "rawpy>=0.27.1,<0.28"]
 
 [project.optional-dependencies]
 test = ["pytest>=8"]

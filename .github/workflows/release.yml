@@ -5,7 +5,7 @@ on:
       tag:
         description: "Version tag matching all package versions (for example v0.2.0)"
         required: true
-        default: v0.2.1
+        default: v0.3.0
       signed:
         description: "Use configured platform signing credentials (required for public distribution)"
         type: boolean

@@ -1,4 +1,42 @@
-# Current verification — 0.2.1 / 2026-10-30
+# Current verification — 0.3.0 / 2026-10-30
+
+This version adds decoded RAW sample evidence and generated renders, an optional
+bounded deeper photo pass, output layout templates, local volume capability checks
+and an explicit folder probe, and a saved source cleanup review.
+
+- 60 Python tests pass, including real LibRaw decoding of synthetic Bayer DNGs,
+  sample equality with different file metadata, unsupported RAW retention, cache
+  reuse, deeper image matching without names/dates, video exclusion, direct visual
+  representatives, template validation/sidecars, hard-link probe cleanup, denied
+  access classified as unknown, read-only volume reporting, and saved cleanup evidence.
+- 24 Chromium/WebKit scenarios pass, covering disk discovery and an explicit local folder test,
+  custom templates and invalid traversal, concrete output paths, saved source cleanup,
+  generated RAW previews and sample evidence, first-run guidance, compact layouts,
+  keyboard operation and WCAG-tagged audits. This is not full accessibility conformance certification.
+- Inspected actual screenshots of disk checks, custom paths, desktop and compact
+  cleanup, and the RAW comparison dialog. Fixed read-only volume reporting, long
+  source-path hierarchy, RAW detail spacing, and the stretched export explainer.
+- TypeScript/Vite, GitHub workflow validation and whitespace checks pass.
+- The bundled engine smoke test runs without Python on PATH and exercises ExifTool,
+  normal image scans/previews, real RAW decoding/previews/sample evidence, a custom
+  same-volume hard-link export and its persisted cleanup review/CSV.
+- Bundled native dependencies support the advertised macOS 14 minimum. Native
+  Apple Silicon application build and local DMG verification pass.
+
+Dependency impact: rawpy 0.27.1 / LibRaw 0.22.1 adds one runtime package and reuses
+NumPy. The installed decoder is about 5.5 MiB; the compressed installer grew from
+47.5 MiB to about 50.7 MiB. No machine-learning stack or video decoder was added.
+
+Current artifact: dist/Photo-Dedup-0.3.0-macos-arm64.dmg. Development signing only;
+public signing/notarization and native Windows/Intel runtime checks remain release
+work. RAW camera/compression variants depend on LibRaw support. Deeper matching is
+bounded and can miss crops, rotations, or weak candidates; suggestions remain review
+items. Cleanup is saved export evidence, not a fresh audit of later source changes
+or uncounted files inside ignored directories. The app never deletes source files.
+
+---
+
+# Previous verification — 0.2.1 / 2026-10-30
 
 The first-run experience now explains the actual niche: old iPhone, smartphone,
 and SD-card imports accumulated across Mac and Windows hosts, gathered onto one

@@ -13,6 +13,8 @@ import numpy as np
 from PIL import Image, ImageCms, ImageOps
 from pillow_heif import register_heif_opener
 
+from .raw import SIGNATURE as RAW_SIGNATURE, inspect_raw, render_raw
+
 register_heif_opener(thumbnails=False, decode_threads=1)
 
 IMAGES = {".jpg", ".jpeg", ".png", ".heic", ".heif", ".tif", ".tiff", ".webp"}
@@ -56,9 +58,20 @@ def rmse(left, right):
     return float(np.sqrt(np.mean(np.square(a - b))))
 
 
-def full_image_rmse(left, right):
-    with Image.open(left) as a, Image.open(right) as b:
-        return rmse(normalized_image(a), normalized_image(b))
+def open_normalized(path, *, half_size=False, raw=None):
+    if raw if raw is not None else Path(path).suffix.lower() in RAW:
+        return render_raw(path, half_size=half_size)
+    with Image.open(path) as opened:
+        return normalized_image(opened)
+
+
+def full_image_rmse(left, right, *, left_raw=None, right_raw=None):
+    return rmse(open_normalized(left, raw=left_raw), open_normalized(right, raw=right_raw))
+
+
+def visual_hash(image):
+    pixels = np.asarray(image.convert("L").resize((9, 8), Image.Resampling.LANCZOS))
+    return int.from_bytes(np.packbits(pixels[:, 1:] > pixels[:, :-1]).tobytes(), "big")
 
 
 def metadata(path, executable):
@@ -127,9 +140,21 @@ def inspect(path: Path, executable=None):
                 record["multi_frame"] = getattr(opened, "n_frames", 1) > 1
                 thumb = image.resize(THUMB_SIZE, Image.Resampling.LANCZOS)
                 record["thumbnail"] = base64.b64encode(thumb.tobytes()).decode("ascii")
+                record["visual_hash"] = visual_hash(image)
         except (OSError, ValueError, Image.DecompressionBombError) as error:
             record["_cacheable"] = False
             record["warnings"].append(f"Image comparison unavailable: {error}")
+    if record["kind"] == "raw":
+        try:
+            sample_hash, image = inspect_raw(path)
+            record["raw_samples_sha256"] = sample_hash
+            record["raw_decoder"] = RAW_SIGNATURE
+            record["render_width"], record["render_height"] = image.size
+            record["thumbnail"] = base64.b64encode(image.resize(THUMB_SIZE, Image.Resampling.LANCZOS).tobytes()).decode("ascii")
+            record["visual_hash"] = visual_hash(image)
+        except Exception as error:
+            record["_cacheable"] = False
+            record["warnings"].append(f"RAW decoding unavailable; original retained: {error}")
     record["metadata"] = tags
     record.setdefault("width", tags.get("ImageWidth", 0))
     record.setdefault("height", tags.get("ImageHeight", 0))
@@ -152,7 +177,7 @@ def engine_signature(executable):
     version = "none"
     if executable:
         version = subprocess.check_output([executable, "-ver"], text=True, timeout=10).strip()
-    return f"inspection-v2|Pillow:{pillow_version}|heif:{pillow_heif.__version__}|exiftool:{version}"
+    return f"inspection-v3|{RAW_SIGNATURE}|Pillow:{pillow_version}|heif:{pillow_heif.__version__}|exiftool:{version}"
 
 
 def exiftool_path():

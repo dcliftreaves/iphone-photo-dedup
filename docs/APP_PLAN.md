@@ -78,6 +78,8 @@ before sending content to ChatGPT Sites or its associated remote repositories.
 ## Deliberate limits
 
 No direct Apple Photos library editing, permanent deletion, cloud sync, video frame
-matching, or rendered RAW comparison. Similarity remains review evidence rather
+matching, or automatic removal of visually similar media. Supported RAW sample
+comparison and generated renders are now included; the optional bounded deeper
+photo pass uses existing NumPy/Pillow plus a small LibRaw wrapper. Similarity remains review evidence rather
 than proof. Hard links are the same-volume default; copies are a less efficient
 fallback that requires additional storage. Neither mode deletes source files.

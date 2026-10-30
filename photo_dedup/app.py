@@ -14,8 +14,10 @@ import uuid
 from PIL import Image, ImageDraw, ImageOps
 
 from . import __version__
-from .export import export_manifest, plan_export
-from .media import exiftool_path, normalized_image
+from .export import export_manifest, plan_export, cleanup_records
+from .media import exiftool_path, normalized_image, open_normalized
+from .layout import DEFAULT_TEMPLATE
+from .volumes import local_volumes, test_folder
 from .review import apply_decisions, record_id
 from .scanner import scan
 
@@ -27,7 +29,7 @@ def now():
 class AppService:
     METHODS = {'health', 'sessions', 'session', 'start_scan', 'restart_scan', 'job',
                'cancel', 'groups', 'group', 'preview', 'decide', 'undo', 'export_plan',
-               'start_export', 'demo', 'issues', 'prepare_sources'}
+               'start_export', 'demo', 'issues', 'prepare_sources', 'local_volumes', 'test_folder', 'cleanup_review'}
 
     def __init__(self, data_dir):
         self.data_dir = Path(data_dir).expanduser().resolve()
@@ -52,6 +54,7 @@ class AppService:
         self.db.execute('PRAGMA journal_mode=WAL')
         self.db.executescript('''
           CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, data TEXT NOT NULL);
+          CREATE TABLE IF NOT EXISTS cleanup_snapshots (session TEXT PRIMARY KEY, data TEXT NOT NULL);
           CREATE TABLE IF NOT EXISTS records (session TEXT, id TEXT, group_id TEXT, status TEXT,
             data TEXT NOT NULL, PRIMARY KEY(session,id));
           CREATE INDEX IF NOT EXISTS record_groups ON records(session,group_id);
@@ -126,6 +129,12 @@ class AppService:
         return dict(same_filesystem=len(devices) == 1, folders=len(paths),
                     hardlink_support_verified=False)
 
+    def local_volumes(self):
+        return local_volumes()
+
+    def test_folder(self, path):
+        return test_folder(path)
+
     def _active(self):
         return any(j['state'] == 'running' for j in self.jobs.values())
 
@@ -178,7 +187,7 @@ class AppService:
         self.threads.append(thread)
         thread.start()
 
-    def start_scan(self, roots, name=None, workers=4, threshold=.02, full_images=False):
+    def start_scan(self, roots, name=None, workers=4, threshold=.02, full_images=False, deep_scan=False):
         if not isinstance(roots, list) or not roots:
             raise ValueError('Choose at least one folder')
         paths = sorted({Path(p).expanduser().resolve() for p in roots})
@@ -195,7 +204,7 @@ class AppService:
         job_id = self._new_job(session_id, 'scan')
         session = dict(id=session_id, name=(name or paths[0].name)[:120], created_at=now(),
                        roots=[str(p) for p in paths], state='scanning', job_id=job_id,
-                       settings=dict(workers=workers, threshold=threshold, full_images=bool(full_images)),
+                       settings=dict(workers=workers, threshold=threshold, full_images=bool(full_images), deep_scan=bool(deep_scan)),
                        counts={}, groups=0, reviewed=0)
         self._save_session(session)
         self._launch_scan(job_id, session)
@@ -272,7 +281,7 @@ class AppService:
             if unique != (filter == 'unique'):
                 continue
             kind = ('metadata' if any(r.get('confidence') == 'metadata_only' for r in records) else
-                    'visual' if any(r.get('confidence') == 'visual_similarity' for r in records) else 'exact')
+                    'visual' if any(r.get('confidence') in {'visual_similarity', 'raw_samples', 'raw_render_similarity', 'deep_visual_similarity'} for r in records) else 'exact')
             decision = decisions.get(group)
             if filter in {'exact', 'visual', 'metadata'} and kind != filter:
                 continue
@@ -284,7 +293,7 @@ class AppService:
             results.append(dict(id=group, kind='unique' if unique else kind, count=len(records),
                                 title=Path(first['path']).name, preview_id=first['id'],
                                 size=sum(r['size'] for r in records), decision=decision,
-                                has_image=first.get('kind') == 'image', media_kind=first.get('kind')))
+                                has_image=first.get('kind') in {'image', 'raw'}, media_kind=first.get('kind')))
         results.sort(key=lambda g: (-g['size'], g['title'], g['id']))
         return dict(items=results[offset:offset + limit], total=len(results), offset=offset)
 
@@ -310,7 +319,7 @@ class AppService:
         if size not in (160, 640, 1600):
             raise ValueError('Unsupported preview size')
         record = self._record(session_id, file_id)
-        if record.get('kind') != 'image':
+        if record.get('kind') not in {'image', 'raw'}:
             return dict(image=None, message='Preview is not available for this format. Original files remain intact.')
         source = Path(record['path'])
         if source.is_symlink() or not source.is_file() or source.stat().st_size != record['size'] or source.stat().st_mtime_ns != record['mtime_ns']:
@@ -319,10 +328,9 @@ class AppService:
         folder.mkdir(parents=True, exist_ok=True)
         cached = folder / f'{file_id}-{size}.png'
         if not cached.exists():
-            with Image.open(source) as opened:
-                result = normalized_image(opened)
-                result.thumbnail((size, size), Image.Resampling.LANCZOS)
-                result.save(cached, format='PNG')
+            result = open_normalized(source, half_size=size <= 640, raw=record.get("kind") == "raw")
+            result.thumbnail((size, size), Image.Resampling.LANCZOS)
+            result.save(cached, format='PNG')
         return dict(image='data:image/png;base64,' + base64.b64encode(cached.read_bytes()).decode(), message=None)
 
     def decide(self, session_id, group_id, action, selected=None):
@@ -379,10 +387,11 @@ class AppService:
                    if r['status'] in {'ignored', 'error'} or r.get('warnings')]
         return dict(items=records[offset:offset + limit], total=len(records))
 
-    def export_plan(self, session_id, destination=None, mode='hardlink'):
+    def export_plan(self, session_id, destination=None, mode='hardlink', template=DEFAULT_TEMPLATE):
         if mode not in {'copy', 'hardlink'}:
             raise ValueError('Unknown export mode')
         manifest = apply_decisions(self._manifest(session_id), self._decisions(session_id))
+        manifest["layout"] = dict(template=template)
         plan = plan_export(manifest)
         total = sum(r['size'] for r in manifest['records'] if r['path'] in plan)
         session = self.session(session_id)
@@ -416,9 +425,10 @@ class AppService:
                 raise ValueError('There is not enough free space for independent copies at this destination')
         return result
 
-    def start_export(self, session_id, destination, mode='hardlink'):
-        approved_plan = self.export_plan(session_id, destination, mode)
+    def start_export(self, session_id, destination, mode='hardlink', template=DEFAULT_TEMPLATE):
+        approved_plan = self.export_plan(session_id, destination, mode, template)
         manifest = apply_decisions(self._manifest(session_id), self._decisions(session_id))
+        manifest['layout'] = dict(template=template)
         job_id = self._new_job(session_id, 'export')
         session = self.session(session_id)
         session.update(state='exporting', job_id=job_id)
@@ -438,8 +448,11 @@ class AppService:
                 self._save_session(session)
             export_manifest(manifest, Path(destination).expanduser(), mode=mode,
                             progress=progress, check_cancel=check_cancel, staging_ready=staging_ready)
+            with self.lock, self.db:
+                self.db.execute('INSERT OR REPLACE INTO cleanup_snapshots VALUES (?,?)',
+                                (session_id, json.dumps(self._cleanup_records(manifest, plan))))
             session.update(state='ready', last_export=str(Path(destination).expanduser().resolve()),
-                           last_export_mode=mode)
+                           last_export_mode=mode, last_export_template=template)
             session.pop('error', None)
             session.pop('pending_export', None)
             self._save_session(session)
@@ -448,6 +461,29 @@ class AppService:
                         errors=approved_plan['errors'], warnings=approved_plan['warnings'])
         self._launch(job_id, task)
         return dict(job_id=job_id, session_id=session_id)
+
+    _cleanup_records = staticmethod(cleanup_records)
+
+    def cleanup_review(self, session_id, offset=0, limit=100):
+        session = self.session(session_id)
+        if not session.get('last_export'):
+            raise ValueError('Complete an export before reviewing source cleanup')
+        with self.lock:
+            row = self.db.execute('SELECT data FROM cleanup_snapshots WHERE session=?', (session_id,)).fetchone()
+        records = json.loads(row[0]) if row else None
+        if records is None:
+            raise ValueError('This older export has no saved cleanup evidence. Export again before using cleanup review.')
+        omitted = [r for r in records if r['disposition'] == 'not_retained']
+        roots = []
+        for root in session['roots']:
+            members = [r for r in records if Path(r['path']) == Path(root) or Path(root) in Path(r['path']).parents]
+            roots.append(dict(path=root, files=len(members), at_risk=sum(r['disposition'] == 'not_retained' for r in members)))
+        offset, limit = max(0, int(offset)), min(100, max(1, int(limit)))
+        return dict(roots=roots, items=omitted[offset:offset + limit], total=len(omitted),
+                    retained=sum(r['disposition'] == 'retained' for r in records),
+                    identical_retained=sum(r['disposition'] == 'identical_retained' for r in records),
+                    message='Saved export evidence, not a fresh disk audit. Files added or changed after the scan are not covered. '
+                            'Verify the library and backup before deleting anything. Ignored directories may contain uncounted files.')
 
     def demo(self):
         folder = self.data_dir / 'demo-photos'

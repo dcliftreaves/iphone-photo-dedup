@@ -96,6 +96,9 @@ not itself edit file contents. Filesystem link counts and change times can chang
 | `keep` | No duplicate confirmed; retained as a representative | `curated/` |
 | `exact_duplicate` | SHA-256 matches another file byte for byte | `duplicates/exact/` |
 | `review` / `visual_similarity` | Similar normalized image pixels; may be an edit | `review/` |
+| `review` / `raw_samples` | Decoded active RAW samples and CFA layout agree; metadata/rendering instructions may differ | `review/` |
+| `review` / `raw_render_similarity` | Similar generated RAW renders; samples may differ | `review/` |
+| `review` / `deep_visual_similarity` | Content-indexed image similarity without requiring names/dates | `review/` |
 | `review` / `metadata_only` | Capture metadata agrees, but content is unverified | `review/` |
 | `sidecar` | Editing metadata preserved independently | Beside its local media when associated |
 | `ignored` | Unsupported extension, symbolic link, or nonregular entry | Not exported; listed in reports |
@@ -115,7 +118,10 @@ matching only; first-frame previews are not used to classify them as similar.
 Candidates share capture time (including available subsecond/timezone metadata),
 camera model, kind, and dimensions. Images without capture dates use normalized
 filenames and dimensions as a fallback. Unrelated names without usable capture
-metadata may remain separate even if visually identical. Video metadata candidates
+metadata may remain separate in the normal pass. The optional `--deep-scan` indexes
+perceptual image hashes and checks at most 200 candidates per image by RMSE, without
+requiring names or dates. It skips video, crops and rotations can be missed, and it
+is a suggestion pass rather than an exhaustive visual search. Video metadata candidates
 must also have equal known durations; this does not verify their frames or audio.
 
 Representative selection is deterministic: preferred format, shortest filename,
@@ -129,10 +135,14 @@ compared directly to retained representatives, avoiding chains of weak similarit
 
 - Images: JPEG, PNG, HEIC/HEIF, TIFF, WebP.
 - RAW: DNG, CR2/CR3, NEF, ARW, RAF, ORF, RW2. Preserved with byte matching and
-  optional ExifTool metadata; RAW rendering and visual comparison are not included.
+  optional ExifTool metadata. LibRaw (via rawpy) decodes supported files, compares active
+  sensor samples, and generates sRGB renders for capture-guided visual review. Unsupported
+  camera/compression variants remain intact with a warning; no embedded-preview verification.
 - Video: MOV, MP4, M4V, AVI, MTS. Byte matching and optional metadata comparison.
 - Sidecars: AAE and XMP. Always preserved; same-directory, same-stem association.
-- RAW/image companions are associated by local stem and both are retained.
+- RAW/image companions are associated by local stem and both are retained by default.
+  An explicit choice within a shared reviewed group can omit an alternate; sidecars
+  and Live Photo components remain protected.
 - Live Photo components are associated by content identifier when ExifTool provides
   one. Same-directory, same-stem image/video pairs without IDs are explicitly
   labeled `possible_live_photo`. Both components are retained.
@@ -234,3 +244,28 @@ The original scripts, README, and supplied April 2020 local notes are archived
 locally under `reference/`, which is excluded from source publication. Git history
 also retains the original GitHub version.
 Sample media and old pickle caches were not imported into project source.
+
+## Layout templates and source cleanup
+
+The desktop export screen offers layout presets and a custom relative template.
+The default is `{camera}/{capture_month}/{stem}{ext}` beneath fixed `curated/` and
+`review/` categories. CLI exports accept `--template '{year}/{month}/{stem}{ext}'`.
+Supported tokens: `{camera}`, `{capture_month}`, `{year}`, `{month}`, `{day}`,
+`{date}`, `{stem}`, `{ext}`, `{kind}`. Extensions include the dot. Templates must
+contain `{stem}` in the filename and end with `{ext}`. No expressions, traversal,
+absolute paths, or arbitrary metadata evaluation. Missing date components use
+explicit Unknown values. Sidecars follow media; collision suffixes remain deterministic.
+
+The completed export says **We don't delete anything** and provides links to the
+original top-level input folders plus a paginated list of files without a retained
+byte-identical counterpart. An omitted exact copy is distinguished from a visual
+alternative with distinct bytes. The manifest and `source-cleanup.csv` preserve this
+snapshot. It does not audit new or changed files after scanning, or count files
+inside ignored directories. Verify the result and backup before manually cleaning up.
+
+APFS, HFS+ and NTFS support file hard links; exFAT and FAT32 do not. **Check local
+disks** lists local mounted volume capabilities without reading media or writing
+probes. **Test hard links in this folder** explicitly creates and removes a tiny
+probe in the chosen folder; access errors report unverified support. Hard links
+provide new paths to retained data without copying media bytes. Directory entries,
+reports and previews still use some space, and this is not a separate backup.

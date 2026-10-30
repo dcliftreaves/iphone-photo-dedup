@@ -11,6 +11,7 @@ export type Session = {
   warnings?: number;
   last_export?: string;
   last_export_mode?: string;
+  last_export_template?: string;
   error?: string;
 };
 export type FileRecord = {

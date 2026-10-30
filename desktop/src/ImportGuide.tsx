@@ -11,7 +11,9 @@ import {
   X,
 } from "lucide-react";
 
-export const GUIDE_KEY = "photo-dedup-import-guide-v1";
+import { DiskCheck } from "./DiskCheck";
+
+export const GUIDE_KEY = "photo-dedup-import-guide-v2";
 const steps = [
   {
     label: "Why it exists",
@@ -30,7 +32,7 @@ const steps = [
   },
   {
     label: "Finish the consolidation",
-    title: "Verify the result. Then retire the old imports.",
+    title: "We don't delete anything",
     icon: ShieldCheck,
   },
 ];
@@ -166,10 +168,12 @@ export function ImportGuide({
                   <p className="guide-small">
                     One physical disk can contain multiple volumes; hard links
                     cannot cross between them. The volume must support hard
-                    links. Cross-disk or unsupported-volume workflows require
-                    independent copies and enough space for another copy of the
-                    selected media.
+                    links. APFS, Mac OS Extended (HFS+) and NTFS support them;
+                    exFAT and FAT32 do not. Cross-disk or unsupported-volume
+                    workflows require independent copies and enough space for
+                    another copy of the selected media.
                   </p>
+                  <DiskCheck />
                   <p className="guide-small">
                     If the media is in Apple Photos, export unmodified originals
                     into ordinary folders first. Work from a verified backup; a
@@ -198,6 +202,19 @@ export function ImportGuide({
                       re-encoded.
                     </li>
                   </ol>
+                  <p>
+                    You can choose a layout preset or build a template from
+                    camera, capture date, filename and other tokens. Curated and
+                    review categories remain separate.
+                  </p>
+                  <p>
+                    Hard links build a new way to view your existing files: a
+                    new directory on the same volume, without copying the media
+                    data. Think of each retained file as a copy that takes no
+                    additional media space. Folders and reports use a little
+                    extra space. Only retained files appear there; editing
+                    shared content through either path changes both.
+                  </p>
                   <pre className="guide-tree">{`Canonical library/\n  curated/<camera>/<YYYY-MM>/…\n  review/<camera>/<YYYY-MM>/…\n  manifest.json   files.csv   summary.txt`}</pre>
                   <p className="guide-small">
                     Unresolved similar and possible matches remain in review/.
@@ -218,6 +235,12 @@ export function ImportGuide({
               )}
               {step === 3 && (
                 <div className="guide-body">
+                  <p>
+                    After export, the source cleanup review links to your
+                    original folders and lists files without a retained
+                    byte-identical counterpart. Open them in Finder or Explorer
+                    before deciding what to remove.
+                  </p>
                   <ol>
                     <li>
                       <strong>Inspect the actual output.</strong> Open curated/
