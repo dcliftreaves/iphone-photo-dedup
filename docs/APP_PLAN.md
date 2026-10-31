@@ -2,15 +2,80 @@
 
 ## Product
 
-A local consolidator for years of loose iPhone, smartphone, and SD-card imports
-from Mac and Windows hosts. Users gather imports on one hard-link-capable volume,
-review repeated downloads, and build an opinionated camera/month directory tree.
-The app leaves source contents and paths in place; users verify the result and
-manually remove the old import paths to finish. Unsupported/error entries and
-omitted alternatives must be accounted for before source trees are removed.
+A temporary, local workspace for consolidating years of loose iPhone, smartphone,
+and SD-card imports from Mac and Windows hosts. The finished result is an ordinary
+organized folder tree with portable reports, usable after the app and its catalog
+are removed. Users verify that result and manually remove old import paths.
 
-First-run onboarding explains why the tool exists, how to prepare inputs, what the
-canonical output contains, and how to finish. The guide stays available from help.
+The app catalog is a database-backed view of source files and the proposed output
+structure. It does not mount a virtual disk or implement a filesystem driver. Scan
+records, duplicate evidence, review choices and proposed folder paths support the
+short-lived consolidation task. The app is not intended to become a permanent
+photo-library manager.
+
+Reviewing and planning do not require hard-link support or sources on one volume.
+Hard links are an efficient build method when retained sources and the output share
+a compatible volume; independent copies support other layouts and filesystems.
+Gathering imports onto one volume remains an optional efficiency strategy, with
+its own copying/space costs. Neither the catalog nor its previews is a backup.
+Source files must remain available until a real output has been built and verified.
+
+First-run onboarding should explain the temporary workspace, preparation choices,
+review decisions, the real output, and manual source cleanup. Unsupported/error
+entries and omitted alternatives must be accounted for before source trees are
+removed.
+
+The catalog workflow below is the next planned milestone. The current app already
+has SQLite scan records and decisions, cached previews, and output-path planning;
+it still presents those mainly as scan sessions and duplicate groups. The proposed
+folder browser, workspace completion/removal flow, and revised preparation screens
+are not implemented yet.
+
+## Next milestone: temporary catalog workflow
+
+1. **Add imports.** Choose ordinary source folders. Show which drives need to remain
+   connected. Explain the same-volume condition when choosing hard-link output,
+   rather than requiring it to begin reviewing. Keep Apple Photos export guidance.
+2. **Review the proposed library.** Provide a folder tree and thumbnail/list view
+   derived from the chosen layout. Every virtual file points to an original source
+   record. Expose duplicate alternatives, matching evidence, source locations and
+   inclusion decisions in that context. Show excluded/unreadable items in a distinct
+   source-items view; do not make them disappear from the accounting.
+3. **Adjust the plan.** Saved inclusion choices and layout changes update the proposed
+   tree and counts without renaming, moving or copying source media. Keep full-detail
+   inspection available through the user's existing viewer. Preserve the focused
+   comparison UI; general file management remains in Finder/Explorer.
+4. **Build the real library.** Preview the exact output paths and choose hard links
+   or independent copies, with capability/device/space checks. Freeze the plan used
+   for the build and revalidate source contents. Preview and export must use the
+   same path, collision and companion-preservation rules.
+5. **Verify and finish.** Open the real output, review source-only items and saved
+   cleanup evidence, then let the user close the completed workspace. Later edits
+   to the catalog never silently update an existing output. Newly added imports
+   require a new scan or an explicit rescan.
+6. **Remove temporary workspace data.** Offer explicit removal of saved workspace
+   records and previews. It must leave original media and completed outputs intact.
+   Keep manifests, decisions and cleanup reports in the output so users can leave
+   the app behind. Shared inspection-cache management is a separate storage action.
+
+### Catalog model and reliability
+
+- Keep physical source identity separate from logical output location. A source
+  record stores its root, original path, file identity/stat data, content hash and
+  inspection evidence; a planned entry references that record and a relative
+  proposed output path. Equal hashes do not erase individual source records.
+- Start by deriving directory nodes from planned-path prefixes. Add indexed/materialized
+  directory records only if measured browsing/pagination performance needs them.
+  Use the existing SQLite/service stack; no additional storage engine is required.
+- Reuse `plan_export` for the proposed tree and actual build. The plan includes
+  decisions, fixed review categories, templates, deterministic collision suffixes
+  and preserved companions. Associate the build with the exact plan revision.
+- Distinguish available, disconnected, missing and changed sources. Cached thumbnails
+  may remain visible with an explicit availability label; they cannot establish that
+  a source is still present or unchanged. Offer deliberate relinking/rescanning;
+  changed evidence must not inherit stale approval without verification.
+- Design for interrupted sessions and builds, not continuous background sync.
+  Keep the source-cleanup checklist tied to a dated, completed output snapshot.
 
 ## Design references
 
@@ -25,7 +90,7 @@ Use an original, calm visual language: warm backgrounds, forest green controls,
 photo-led group cards, explicit confidence labels, and clear action language.
 Keep matching thresholds and filesystem details out of the primary workflow.
 
-## Implementation order
+## Existing implementation foundation
 
 1. Preserve scan evidence and add persistent, undoable review decisions.
 2. Make export planning honor decisions and preserve companions and audit records.
@@ -81,8 +146,10 @@ No direct Apple Photos library editing, permanent deletion, cloud sync, video fr
 matching, or automatic removal of visually similar media. Supported RAW sample
 comparison and generated renders are now included; the optional bounded deeper
 photo pass uses existing NumPy/Pillow plus a small LibRaw wrapper. Similarity remains review evidence rather
-than proof. Hard links are the same-volume default; copies are a less efficient
-fallback that requires additional storage. Neither mode deletes source files.
+than proof. The catalog has no hard-link requirement. Real output uses hard links
+when appropriate or copies with their additional storage cost. Neither mode deletes
+source files. No mounted filesystem, background folder watching, or general-purpose
+Finder replacement is planned.
 
 
 ## Freshman CS student walkthrough — 2026-10-30
