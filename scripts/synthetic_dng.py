@@ -50,4 +50,3 @@ def make_dng(path, description='original', change=False):
         if entry[0] == 273: entry[3] = long(pixel_offset)
     header = b'II*\0'+long(8)+short(len(tags))
     path.write_bytes(header+b''.join(struct.pack('<HHI',*e[:3])+e[3] for e in entries)+long(0)+extra+samples.astype('<u2').tobytes())
-
