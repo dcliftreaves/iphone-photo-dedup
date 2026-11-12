@@ -1,0 +1,98 @@
+name: Build draft desktop release
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Version tag matching all package versions (for example v0.2.0)"
+        required: true
+        default: v0.3.1
+      signed:
+        description: "Use configured platform signing credentials (required for public distribution)"
+        type: boolean
+        default: false
+  push:
+    tags: ["v[0-9]*"]
+permissions:
+  contents: write
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    environment: release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            target: aarch64-apple-darwin
+            bundles: app
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+            bundles: app
+          - os: windows-2025
+            target: x86_64-pc-windows-msvc
+            bundles: nsis
+    runs-on: ${{ matrix.os }}
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+      SIGNED_RELEASE: ${{ github.event_name == 'push' || inputs.signed }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - run: python -m pip install -e '.[test,build]'
+      - run: python scripts/check_version.py
+      - run: python -m pytest -q
+      - run: npm ci --prefix desktop
+      - run: npm --prefix desktop run build
+      - name: Configure signing
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
+          WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: python scripts/configure_signing.py
+      - name: Build signed engine
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ env.SIGNED_RELEASE == 'true' && secrets.APPLE_SIGNING_IDENTITY || '' }}
+        run: python scripts/build_engine.py
+      - run: python scripts/smoke_engine.py
+      - run: python scripts/check_macos_runtime.py
+      - uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_CERTIFICATE: ${{ env.SIGNED_RELEASE == 'true' && secrets.APPLE_CERTIFICATE || '' }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ env.SIGNED_RELEASE == 'true' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
+          APPLE_SIGNING_IDENTITY: ${{ env.SIGNED_RELEASE == 'true' && secrets.APPLE_SIGNING_IDENTITY || '' }}
+          APPLE_API_ISSUER: ${{ env.SIGNED_RELEASE == 'true' && secrets.APPLE_API_ISSUER || '' }}
+          APPLE_API_KEY: ${{ env.SIGNED_RELEASE == 'true' && secrets.APPLE_API_KEY || '' }}
+          APPLE_API_KEY_PATH: ${{ env.APPLE_API_KEY_PATH }}
+        with:
+          projectPath: desktop
+          retryAttempts: 2
+          args: --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} --config release-config.json
+      - name: Package macOS installer without Finder automation
+        if: runner.os == 'macOS'
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ env.SIGNED_RELEASE == 'true' && secrets.APPLE_SIGNING_IDENTITY || '' }}
+        run: python scripts/package_macos.py --app "desktop/src-tauri/target/${{ matrix.target }}/release/bundle/macos/Photo Dedup.app" --output "dist/Photo-Dedup-${{ env.RELEASE_TAG }}-${{ matrix.target }}.dmg"
+      - name: Upload installer to draft GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/upload_release.py --target "${{ matrix.target }}"
